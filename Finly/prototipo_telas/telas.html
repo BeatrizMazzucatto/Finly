@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finly - Design System Update</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-app: #F5F5F5;
+            --card-white: #FFFFFF;
+            --text-dark: #2D3436;
+            --text-gray: #777777;
+            /* Paleta de Categorias */
+            --cat-transporte: #BDE0FE;
+            --cat-alimentacao: #CDB4DB;
+            --cat-saude: #FFD97D;
+            --cat-lazer: #FFC8DD;
+            --primary-blue: #4A90E2;
+        }
+
+        * { box-sizing: border-box; font-family: 'Inter', 'Segoe UI', sans-serif; }
+        body { background: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+
+        /*Container do Celular*/
+        .phone {
+            width: 375px;
+            height: 750px;
+            background: var(--bg-app);
+            border: 10px solid #111;
+            border-radius: 40px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
+        .screen { display: none; height: 100%; flex-direction: column; animation: slideUp 0.3s ease-out; }
+        .screen.active { display: flex; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        header { padding: 25px 20px 15px; text-align: center; }
+        h2 { margin: 0; color: var(--text-dark); font-size: 20px; font-weight: 700; }
+        .content { padding: 0 20px 80px; flex: 1; overflow-y: auto; }
+
+        /* Card Style (Global) */
+        .card { 
+            background: var(--card-white); 
+            border-radius: 18px; 
+            padding: 20px; 
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+
+        /* Botões */
+        .btn-main { background: var(--primary-blue); color: white; border: none; padding: 16px; border-radius: 12px; font-weight: 600; width: 100%; cursor: pointer; }
+        .btn-text { background: none; border: none; color: var(--text-gray); padding: 10px; width: 100%; cursor: pointer; text-decoration: underline; }
+
+        /* Dashboard: Gráfico de Rosca */
+        .chart-container {
+            width: 180px; height: 180px;
+            margin: 20px auto;
+            border-radius: 50%;
+            border: 15px solid var(--cat-transporte); /* Simulação de fatias */
+            border-top-color: var(--cat-alimentacao);
+            border-right-color: var(--cat-lazer);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            position: relative;
+        }
+        .chart-inner { text-align: center; }
+        .chart-inner small { color: var(--text-gray); font-size: 12px; }
+        .chart-inner div { font-size: 22px; font-weight: 800; color: var(--text-dark); }
+
+        /* Carrossel Top Movers */
+        .mover-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+        .mover-card { 
+            min-width: 110px; padding: 15px; border-radius: 15px; 
+            display: flex; flex-direction: column; gap: 8px;
+        }
+
+        /* Lista de Transações (Bottom Sheet Style) */
+        .bottom-list { 
+            background: var(--card-white); 
+            border-radius: 25px 25px 0 0; 
+            padding: 20px; margin-top: 10px; flex: 1;
+        }
+        .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .list-header span { font-size: 12px; font-weight: 800; color: var(--text-gray); letter-spacing: 1px; }
+
+        .transaction-item {
+            display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .icon-circle { width: 40px; height: 40px; border-radius: 12px; margin-right: 12px; display: flex; align-items: center; justify-content: center; }
+        .item-details { flex: 1; }
+        .item-details b { display: block; font-size: 14px; color: var(--text-dark); }
+        .item-details small { color: var(--text-gray); font-size: 12px; }
+        .item-value { font-weight: 700; font-size: 14px; }
+
+        /* Navbar Inferior */
+        .nav-bar { 
+            position: absolute; bottom: 0; width: 100%; height: 70px; 
+            background: var(--card-white); display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
+        }
+        .nav-icon { color: #BBB; font-size: 20px; cursor: pointer; transition: 0.2s; }
+        .nav-icon.active { color: var(--primary-blue); }
+
+        /* Modal Bottom Sheet */
+        .bottom-sheet {
+            position: absolute; bottom: -100%; left: 0; width: 100%; height: 80%;
+            background: var(--card-white); border-radius: 30px 30px 0 0;
+            z-index: 100; transition: 0.4s; padding: 30px 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+        }
+        .bottom-sheet.open { bottom: 0; }
+        .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: inline-block; margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="phone">
+    
+    <div id="screen-onboarding" class="screen active">
+        <div class="content" style="display: flex; flex-direction: column; justify-content: center; padding-top: 100px;">
+            <div class="card" style="text-align: center;">
+                <h2 style="margin-bottom: 10px;">Bem-vindo ao Finly!</h2>
+                <p style="color: var(--text-gray); font-size: 14px;">Para começar, precisamos de uma informação básica.</p>
+                <div style="margin: 30px 0; text-align: left;">
+                    <label style="font-size: 12px; font-weight: bold; color: var(--text-gray);">QUAL SUA RENDA MENSAL ATUAL?</label>
+                    <input type="text" value="R$ " style="width: 100%; padding: 15px; border: 2px solid #EEE; border-radius: 10px; font-size: 20px; margin-top: 10px;">
+                </div>
+                <button class="btn-main" onclick="navTo('screen-dashboard')">Salvar e Continuar</button>
+                <button class="btn-text" onclick="navTo('screen-dashboard')">Pular configuração</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-dashboard" class="screen">
+        <header><h2>Estatísticas</h2></header>
+        <div class="content">
+            <div class="chart-container">
+                <div class="chart-inner">
+                    <small>Esse mês</small>
+                    <div>R$ 2.450</div>
+                </div>
+            </div>
+
+            <h3 style="font-size: 16px; margin: 10px 0;">Categorias</h3>
+            <div class="mover-scroll">
+                <div class="mover-card" style="background: var(--cat-transporte);">
+                    <i class="fa-solid fa-car"></i>
+                    <b>Transporte</b>
+                    <small>12 Transações</small>
+                </div>
+                <div class="mover-card" style="background: var(--cat-alimentacao);">
+                    <i class="fa-solid fa-utensils"></i>
+                    <b>Alimentação</b>
+                    <small>24 Transações</small>
+                </div>
+                <div class="mover-card" style="background: var(--cat-lazer);">
+                    <i class="fa-solid fa-clapperboard"></i>
+                    <b>Lazer</b>
+                    <small>8 Transações</small>
+                </div>
+            </div>
+
+            <div class="bottom-list">
+                <div class="list-header">
+                    <span>TRANSAÇÕES</span>
+                    <span style="color: var(--primary-blue)">Hoje <i class="fa-solid fa-chevron-down"></i></span>
+                </div>
+                <div class="transaction-item">
+                    <div class="icon-circle" style="background: var(--cat-alimentacao);"><i class="fa-solid fa-burger"></i></div>
+                    <div class="item-details"><b>Burger King</b><small>Alimentação • 14:20</small></div>
+                    <div class="item-value">- R$ 42,00</div>
+                </div>
+                <div class="transaction-item">
+                    <div class="icon-circle" style="background: var(--cat-transporte);"><i class="fa-solid fa-gas-pump"></i></div>
+                    <div class="item-details"><b>Posto Shell</b><small>Transporte • Ontem</small></div>
+                    <div class="item-value">- R$ 150,00</div>
+                </div>
+            </div>
+        </div>
+        <div style="position: absolute; bottom: 85px; right: 20px; width: 50px; height: 50px; background: var(--primary-blue); border-radius: 15px; color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 5px 15px rgba(74, 144, 226, 0.4);" onclick="openSheet()">
+            <i class="fa-solid fa-plus"></i>
+        </div>
+    </div>
+
+    <div id="screen-history" class="screen">
+        <header><h2>Histórico</h2></header>
+        <div class="content">
+            <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding: 5px 0;">
+                <div style="padding: 8px 16px; background: var(--primary-blue); color: white; border-radius: 20px; font-size: 12px;">Todos</div>
+                <div style="padding: 8px 16px; background: var(--cat-alimentacao); color: var(--text-dark); border-radius: 20px; font-size: 12px;">Alimentação</div>
+                <div style="padding: 8px 16px; background: var(--cat-transporte); border-radius: 20px; font-size: 12px;">Transporte</div>
+            </div>
+            
+            <p style="font-size: 12px; font-weight: bold; color: var(--text-gray); margin-bottom: 10px;">ESTA SEMANA</p>
+            <div class="card" style="padding: 10px 15px;">
+                <div class="transaction-item" style="border: none;">
+                    <div class="icon-circle" style="background: var(--cat-saude);"><i class="fa-solid fa-pills"></i></div>
+                    <div class="item-details"><b>Farmácia Viva</b><small>Saúde • 22 Out</small></div>
+                    <div class="item-value">- R$ 89,90</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-config" class="screen">
+        <header><h2>Configurações</h2></header>
+        <div class="content">
+            <div class="card">
+                <small style="color: var(--text-gray); font-weight: bold;">LIMITE DE GASTOS MENSAL</small>
+                <input type="text" value="R$ 1.200,00" style="width: 100%; border: none; font-size: 24px; font-weight: 700; padding: 10px 0; color: var(--primary-blue);">
+                <div style="height: 6px; background: #EEE; border-radius: 3px; margin-top: 5px;">
+                    <div style="width: 65%; height: 100%; background: var(--primary-blue); border-radius: 3px;"></div>
+                </div>
+            </div>
+
+            <div class="card" style="display: flex; align-items: center; justify-content: space-between;">
+                <span><i class="fa-solid fa-tags" style="margin-right: 10px; color: var(--primary-blue);"></i> Categorias</span>
+                <i class="fa-solid fa-chevron-right" style="color: #CCC;"></i>
+            </div>
+            
+            <div class="card" style="margin-top: 50px;">
+                <button class="btn-text" style="color: #e74c3c; text-align: left; padding: 0;" onclick="navTo('screen-onboarding')">Sair da Conta</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sheet-new" class="bottom-sheet">
+        <div style="width: 40px; height: 4px; background: #EEE; margin: -15px auto 20px; border-radius: 2px;"></div>
+        <div style="display: flex; gap: 10px; margin-bottom: 25px;">
+            <button class="btn-main" style="flex: 1; background: var(--text-dark);">Despesa</button>
+            <button class="btn-main" style="flex: 1; background: #EEE; color: #777;">Receita</button>
+        </div>
+        <input type="number" placeholder="0,00" style="width: 100%; font-size: 40px; text-align: center; border: none; font-weight: 800; margin-bottom: 20px;">
+        
+        <p style="font-size: 12px; font-weight: bold; color: var(--text-gray);">SELECIONE A CATEGORIA</p>
+        <div style="margin: 15px 0 30px;">
+            <span class="color-dot" style="background: var(--cat-transporte);"></span>
+            <span class="color-dot" style="background: var(--cat-alimentacao);"></span>
+            <span class="color-dot" style="background: var(--cat-saude);"></span>
+            <span class="color-dot" style="background: var(--cat-lazer);"></span>
+        </div>
+
+        <button class="btn-main" onclick="closeSheet()">Salvar Transação</button>
+        <button class="btn-text" onclick="closeSheet()">Cancelar</button>
+    </div>
+
+    <nav class="nav-bar">
+        <i class="fa-solid fa-chart-pie nav-icon active" onclick="navTo('screen-dashboard', this)"></i>
+        <i class="fa-solid fa-receipt nav-icon" onclick="navTo('screen-history', this)"></i>
+        <i class="fa-solid fa-gear nav-icon" onclick="navTo('screen-config', this)"></i>
+    </nav>
+
+</div>
+
+<script>
+    function navTo(screenId, el) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+        
+        if(el) {
+            document.querySelectorAll('.nav-icon').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+        }
+        closeSheet();
+    }
+
+    function openSheet() {
+        document.getElementById('sheet-new').classList.add('open');
+    }
+
+    function closeSheet() {
+        document.getElementById('sheet-new').classList.remove('open');
+    }
+</script>
+
+</body>
+</html>
