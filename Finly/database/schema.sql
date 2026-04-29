@@ -59,3 +59,10 @@ CREATE TABLE alertas (
     data_alerta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
 );
+
+-- Seed para teste de login no app (backend atual compara senha em texto)
+INSERT INTO usuarios (nome, email, senha_hash, renda_mensal_inicial, limite_gastos_mensal)
+VALUES ('Julia', 'julia@gmail.com', '12345', 0.00, 0.00)
+ON DUPLICATE KEY UPDATE
+  nome = VALUES(nome),
+  senha_hash = VALUES(senha_hash);
