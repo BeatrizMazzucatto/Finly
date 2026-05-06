@@ -18,7 +18,19 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="transaction-form"
+            options={{
+              presentation: 'modal',
+              title: 'Transação',
+              headerShown: true,
+              headerStyle: { backgroundColor: '#F5F7FB' },
+              headerTintColor: '#2563EB',
+              headerTitleStyle: { fontWeight: '700', color: '#0F172A' },
+            }}
+          />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />
