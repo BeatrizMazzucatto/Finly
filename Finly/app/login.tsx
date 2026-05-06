@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Redirect, router } from "expo-router";
 import { useState } from "react";
 import {
@@ -13,6 +14,8 @@ import {
 
 import { useAuth } from "@/src/context/AuthContext";
 
+const ONBOARDING_KEY = "finly_onboarding_done";
+
 export default function LoginScreen() {
   const { user, loading, login } = useAuth();
   const [email, setEmail] = useState("");
@@ -25,6 +28,7 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
+    // US11 — Validação de campos obrigatórios
     if (!email.trim() || !senha.trim()) {
       setError("Preencha email e senha.");
       return;
@@ -34,7 +38,14 @@ export default function LoginScreen() {
       setSubmitting(true);
       setError(null);
       await login(email.trim(), senha);
-      router.replace("/(tabs)");
+
+      // Verifica se é o primeiro acesso (US01)
+      const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
+      if (!onboardingDone) {
+        router.replace("/onboarding");
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao entrar");
     } finally {
@@ -49,7 +60,9 @@ export default function LoginScreen() {
     >
       <View style={styles.card}>
         <Text style={styles.title}>Finly</Text>
-        <Text style={styles.subtitle}>Controle financeiro conectado ao seu backend.</Text>
+        <Text style={styles.subtitle}>
+          Controle financeiro conectado ao seu backend.
+        </Text>
 
         <TextInput
           autoCapitalize="none"
