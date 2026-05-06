@@ -8,9 +8,11 @@ app.use(express.json());
 
 const transacoesRoutes = require("./routes/transacoes");
 const usuariosRoutes = require("./routes/usuarios");
+const categoriasRoutes = require("./routes/categorias");
 
 app.use("/transacoes", transacoesRoutes);
 app.use("/usuarios", usuariosRoutes);
+app.use("/categorias", categoriasRoutes);
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
