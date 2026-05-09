@@ -8,36 +8,32 @@ import {
   StyleSheet,
   Text,
   View,
+  StatusBar,
+  Dimensions,
 } from "react-native";
 import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { apiRequest } from "@/src/services/api";
 import { getTransactionsByUser } from "@/src/services/transactions";
 import type { Transaction } from "@/src/types/api";
-import TransactionFilters from "@/src/components/TransactionFilters";
-import SpendingLimitCard from "@/src/components/SpendingLimitCard";
+import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
+import { Card, ProgressBar, TransactionItem } from "@/components/ui";
+import { formatCurrency, getGreeting, getCurrentMonthYear } from "@/utils/formatters";
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
+const { width } = Dimensions.get("window");
+const LIMITE_KEY = "finly_limite_gastos";
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return "";
-  const [year, month, day] = dateStr.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-export default function DashboardScreen() {
+export default function HomeScreen() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limite, setLimite] = useState(2000);
 
   const totalReceitas = useMemo(
     () => transactions.filter((t) => t.tipo === "RECEITA").reduce((a, t) => a + Number(t.valor), 0),
@@ -48,19 +44,27 @@ export default function DashboardScreen() {
     [transactions]
   );
   const saldo = totalReceitas - totalDespesas;
+  const limiteProgress = (totalDespesas / limite) * 100;
+  const recentTransactions = transactions.slice(0, 4);
 
-  async function loadTransactions(isPullToRefresh = false) {
+  async function loadData(isPullToRefresh = false) {
     if (!user) return;
     try {
       setError(null);
       if (isPullToRefresh) setRefreshing(true);
       else setLoading(true);
-      const data = await getTransactionsByUser(user.id_usuario);
+
+      const [data, limiteStored] = await Promise.all([
+        getTransactionsByUser(user.id_usuario),
+        AsyncStorage.getItem(LIMITE_KEY),
+      ]);
+
+      if (limiteStored) setLimite(Number(limiteStored));
+
       const sorted = [...data].sort(
         (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
       );
       setTransactions(sorted);
-      setFilteredTransactions(sorted);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
@@ -70,13 +74,8 @@ export default function DashboardScreen() {
   }
 
   useEffect(() => {
-    loadTransactions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadData();
   }, [user?.id_usuario]);
-
-  const handleFilterChange = useCallback((filtered: Transaction[]) => {
-    setFilteredTransactions(filtered);
-  }, []);
 
   function handleEdit(item: Transaction) {
     router.push({
@@ -104,7 +103,7 @@ export default function DashboardScreen() {
           onPress: async () => {
             try {
               await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
-              await loadTransactions();
+              await loadData();
             } catch (err) {
               Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
             }
@@ -118,109 +117,451 @@ export default function DashboardScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTransactions(true)} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />}
+      showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.header}>Resumo financeiro</Text>
-      <Text style={styles.greeting}>Olá, {user?.nome ?? "usuário"}. 👋</Text>
+      <StatusBar barStyle="light-content" />
 
-      <View style={styles.cardsRow}>
-        <View style={[styles.card, styles.cardFlex]}>
-          <Text style={styles.cardLabel}>Saldo</Text>
-          <Text style={[styles.cardValue, { color: saldo >= 0 ? "#15803D" : "#B91C1C" }]}>
+      {/* Header com Saldo */}
+      <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>{getGreeting()},</Text>
+            <Text style={styles.userName}>{user?.nome ?? "Usuário"}</Text>
+          </View>
+          <Pressable style={styles.notificationBtn}>
+            <Feather name="bell" size={22} color={Colors.textInverse} />
+            <View style={styles.notificationBadge} />
+          </Pressable>
+        </View>
+
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>Saldo atual</Text>
+          <Text style={[styles.balanceValue, { color: saldo >= 0 ? Colors.income : Colors.error }]}>
             {formatCurrency(saldo)}
           </Text>
+          <Text style={styles.monthLabel}>{getCurrentMonthYear()}</Text>
         </View>
-        <View style={[styles.card, styles.cardFlex]}>
-          <Text style={styles.cardLabel}>Receitas</Text>
-          <Text style={[styles.cardValue, { color: "#15803D" }]}>{formatCurrency(totalReceitas)}</Text>
+
+        {/* Quick Stats */}
+        <View style={styles.quickStats}>
+          <View style={styles.quickStatItem}>
+            <View style={[styles.quickStatIcon, { backgroundColor: Colors.incomeLight }]}>
+              <Feather name="arrow-up" size={16} color={Colors.income} />
+            </View>
+            <View>
+              <Text style={styles.quickStatLabel}>Receitas</Text>
+              <Text style={[styles.quickStatValue, { color: Colors.income }]}>
+                {formatCurrency(totalReceitas)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.quickStatDivider} />
+          <View style={styles.quickStatItem}>
+            <View style={[styles.quickStatIcon, { backgroundColor: Colors.expenseLight }]}>
+              <Feather name="arrow-down" size={16} color={Colors.expense} />
+            </View>
+            <View>
+              <Text style={styles.quickStatLabel}>Despesas</Text>
+              <Text style={[styles.quickStatValue, { color: Colors.expense }]}>
+                {formatCurrency(totalDespesas)}
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
-      <View style={[styles.card, { marginBottom: 12 }]}>
-        <Text style={styles.cardLabel}>Despesas</Text>
-        <Text style={[styles.cardValue, { color: "#B91C1C" }]}>{formatCurrency(totalDespesas)}</Text>
-      </View>
+      </LinearGradient>
 
-      <Text style={styles.sectionTitle}>Limite de Gastos</Text>
-      <SpendingLimitCard totalDespesas={totalDespesas} />
-
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Transações</Text>
-        <Pressable style={styles.btnNova} onPress={() => router.push("/transaction-form")}>
-          <Text style={styles.btnNovaText}>+ Nova</Text>
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <Pressable style={styles.quickActionItem} onPress={() => router.push("/transaction-form")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: Colors.primary + "15" }]}>
+            <Feather name="plus" size={24} color={Colors.primary} />
+          </View>
+          <Text style={styles.quickActionText}>Adicionar</Text>
+        </Pressable>
+        <Pressable style={styles.quickActionItem} onPress={() => router.push("/(tabs)/statistics")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: Colors.secondary + "15" }]}>
+            <Feather name="pie-chart" size={24} color={Colors.secondary} />
+          </View>
+          <Text style={styles.quickActionText}>Estatísticas</Text>
+        </Pressable>
+        <Pressable style={styles.quickActionItem} onPress={() => router.push("/(tabs)/history")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: Colors.warning + "15" }]}>
+            <Feather name="clock" size={24} color={Colors.warning} />
+          </View>
+          <Text style={styles.quickActionText}>Histórico</Text>
+        </Pressable>
+        <Pressable style={styles.quickActionItem} onPress={() => router.push("/(tabs)/settings")}>
+          <View style={[styles.quickActionIcon, { backgroundColor: Colors.textMuted + "15" }]}>
+            <Feather name="settings" size={24} color={Colors.textMuted} />
+          </View>
+          <Text style={styles.quickActionText}>Config</Text>
         </Pressable>
       </View>
 
-      <TransactionFilters transactions={transactions} onFilterChange={handleFilterChange} />
+      {/* Limite de Gastos */}
+      <Card style={styles.limiteCard}>
+        <View style={styles.limiteHeader}>
+          <View style={styles.limiteTitleRow}>
+            <Feather name="shield" size={20} color={Colors.primary} />
+            <Text style={styles.limiteTitle}>Limite de Gastos</Text>
+          </View>
+          <Text style={[
+            styles.limitePercent,
+            { color: limiteProgress > 80 ? Colors.error : limiteProgress > 60 ? Colors.warning : Colors.primary },
+          ]}>
+            {Math.round(limiteProgress)}%
+          </Text>
+        </View>
+        <ProgressBar
+          progress={limiteProgress}
+          color={limiteProgress > 80 ? Colors.error : limiteProgress > 60 ? Colors.warning : Colors.primary}
+          height={10}
+          showOverflow
+        />
+        <View style={styles.limiteFooter}>
+          <Text style={styles.limiteUsed}>{formatCurrency(totalDespesas)}</Text>
+          <Text style={styles.limiteTotal}>de {formatCurrency(limite)}</Text>
+        </View>
+        {limiteProgress > 80 && (
+          <View style={styles.limiteAlert}>
+            <Feather name="alert-triangle" size={16} color={Colors.error} />
+            <Text style={styles.limiteAlertText}>
+              Você está próximo do limite mensal!
+            </Text>
+          </View>
+        )}
+      </Card>
 
-      {loading ? (
-        <ActivityIndicator size="large" style={{ marginTop: 24 }} />
-      ) : error ? (
-        <Text style={styles.error}>{error}</Text>
-      ) : filteredTransactions.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Nenhuma transação encontrada.</Text>
-          <Pressable style={styles.btnEmptyAdd} onPress={() => router.push("/transaction-form")}>
-            <Text style={styles.btnEmptyAddText}>Cadastrar primeira transação</Text>
+      {/* Transações Recentes */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Atividade Recente</Text>
+          <Pressable onPress={() => router.push("/(tabs)/history")}>
+            <Text style={styles.seeAllText}>Ver tudo</Text>
           </Pressable>
         </View>
-      ) : (
-        filteredTransactions.map((item) => (
-          <View key={item.id_transacao} style={styles.transactionItem}>
-            <View style={[styles.badge, { backgroundColor: item.tipo === "DESPESA" ? "#FEE2E2" : "#DCFCE7" }]}>
-              <Text style={styles.badgeText}>{item.tipo === "DESPESA" ? "↓" : "↑"}</Text>
-            </View>
-            <View style={styles.transactionInfo}>
-              <Text style={styles.transactionTitle}>{item.titulo}</Text>
-              <Text style={styles.transactionMeta}>
-                {item.categoria ?? "Sem categoria"} • {formatDate(item.data_transacao)}
-              </Text>
-            </View>
-            <Text style={[styles.transactionValue, { color: item.tipo === "DESPESA" ? "#B91C1C" : "#15803D" }]}>
-              {item.tipo === "DESPESA" ? "-" : "+"}{formatCurrency(Number(item.valor))}
+
+        {loading ? (
+          <ActivityIndicator size="large" style={{ marginVertical: Spacing.xxl }} />
+        ) : error ? (
+          <Card variant="error" style={styles.errorCard}>
+            <Feather name="alert-circle" size={24} color={Colors.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </Card>
+        ) : recentTransactions.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Feather name="inbox" size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>Nenhuma transação</Text>
+            <Text style={styles.emptySubtitle}>
+              Comece adicionando sua primeira transação
             </Text>
-            <View style={styles.actions}>
-              <Pressable onPress={() => handleEdit(item)} style={styles.actionBtn}>
-                <Text style={styles.actionEdit}>✏️</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDelete(item)} style={styles.actionBtn}>
-                <Text style={styles.actionDelete}>🗑️</Text>
-              </Pressable>
-            </View>
+            <Pressable style={styles.emptyButton} onPress={() => router.push("/transaction-form")}>
+              <Feather name="plus" size={18} color={Colors.textInverse} />
+              <Text style={styles.emptyButtonText}>Adicionar transação</Text>
+            </Pressable>
+          </Card>
+        ) : (
+          <View style={styles.transactionsList}>
+            {recentTransactions.map((item) => (
+              <TransactionItem
+                key={item.id_transacao}
+                id={item.id_transacao}
+                titulo={item.titulo}
+                valor={Number(item.valor)}
+                tipo={item.tipo}
+                categoria={item.categoria ?? "Outros"}
+                data={item.data_transacao}
+                onPress={() => handleEdit(item)}
+              />
+            ))}
           </View>
-        ))
-      )}
+        )}
+      </View>
+
+      {/* Dica do dia */}
+      <Card style={styles.tipCard}>
+        <View style={styles.tipIcon}>
+          <Feather name="zap" size={20} color={Colors.warning} />
+        </View>
+        <View style={styles.tipContent}>
+          <Text style={styles.tipTitle}>Dica do dia</Text>
+          <Text style={styles.tipText}>
+            Defina metas de economia para alcançar seus objetivos financeiros mais rapidamente.
+          </Text>
+        </View>
+      </Card>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F7FB" },
-  content: { padding: 16, paddingTop: 24, paddingBottom: 36, gap: 8 },
-  header: { fontSize: 26, fontWeight: "700", color: "#0F172A" },
-  greeting: { color: "#334155", fontSize: 14, marginBottom: 12 },
-  cardsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E2E8F0" },
-  cardFlex: { flex: 1 },
-  cardLabel: { color: "#64748B", fontSize: 12, marginBottom: 4 },
-  cardValue: { fontSize: 18, fontWeight: "700" },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 8, marginTop: 4 },
-  btnNova: { backgroundColor: "#2563EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  btnNovaText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
-  transactionItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8, gap: 10 },
-  badge: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  badgeText: { fontSize: 16, fontWeight: "700" },
-  transactionInfo: { flex: 1 },
-  transactionTitle: { fontWeight: "700", color: "#0F172A", fontSize: 14 },
-  transactionMeta: { color: "#64748B", marginTop: 2, fontSize: 12 },
-  transactionValue: { fontWeight: "700", fontSize: 13 },
-  actions: { flexDirection: "row", gap: 4 },
-  actionBtn: { padding: 4, borderRadius: 8 },
-  actionEdit: { fontSize: 16 },
-  actionDelete: { fontSize: 16 },
-  emptyContainer: { alignItems: "center", paddingVertical: 32, gap: 12 },
-  emptyText: { color: "#64748B", fontSize: 14 },
-  btnEmptyAdd: { backgroundColor: "#2563EB", borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
-  btnEmptyAddText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
-  error: { color: "#B91C1C", fontSize: 14, marginTop: 8 },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    paddingBottom: 100,
+  },
+  header: {
+    paddingTop: 50,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xxxl,
+    borderBottomLeftRadius: BorderRadius.xl,
+    borderBottomRightRadius: BorderRadius.xl,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+  },
+  greeting: {
+    fontSize: FontSize.sm,
+    color: Colors.textInverse,
+    opacity: 0.8,
+  },
+  userName: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: Colors.textInverse,
+  },
+  notificationBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.error,
+  },
+  balanceCard: {
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+  },
+  balanceLabel: {
+    fontSize: FontSize.sm,
+    color: Colors.textInverse,
+    opacity: 0.8,
+    marginBottom: Spacing.xs,
+  },
+  balanceValue: {
+    fontSize: 40,
+    fontWeight: FontWeight.bold,
+  },
+  monthLabel: {
+    fontSize: FontSize.sm,
+    color: Colors.textInverse,
+    opacity: 0.7,
+    marginTop: Spacing.xs,
+  },
+  quickStats: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  quickStatItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  quickStatIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickStatLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textInverse,
+    opacity: 0.8,
+  },
+  quickStatValue: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+  },
+  quickStatDivider: {
+    width: 1,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    marginHorizontal: Spacing.lg,
+  },
+  quickActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    marginTop: -Spacing.xl,
+    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    ...Shadow.md,
+  },
+  quickActionItem: {
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  quickActionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionText: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.medium,
+  },
+  limiteCard: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+  },
+  limiteHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  limiteTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  limiteTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+  },
+  limitePercent: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  limiteFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: Spacing.sm,
+  },
+  limiteUsed: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+  },
+  limiteTotal: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
+  },
+  limiteAlert: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  limiteAlertText: {
+    fontSize: FontSize.sm,
+    color: Colors.error,
+    flex: 1,
+  },
+  section: {
+    marginTop: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  seeAllText: {
+    fontSize: FontSize.sm,
+    color: Colors.primary,
+    fontWeight: FontWeight.medium,
+  },
+  transactionsList: {
+    gap: Spacing.sm,
+  },
+  errorCard: {
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  errorText: {
+    color: Colors.error,
+    fontSize: FontSize.sm,
+  },
+  emptyCard: {
+    alignItems: "center",
+    paddingVertical: Spacing.xxl,
+    gap: Spacing.sm,
+  },
+  emptyTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+  },
+  emptySubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
+  emptyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+  },
+  emptyButtonText: {
+    color: Colors.textInverse,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+  },
+  tipCard: {
+    flexDirection: "row",
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xl,
+    gap: Spacing.md,
+  },
+  tipIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.warningLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  tipText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
 });

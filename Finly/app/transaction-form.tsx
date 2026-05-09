@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -12,9 +11,15 @@ import {
   Text,
   TextInput,
   View,
+  StatusBar,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { apiRequest } from "@/src/services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
+import { CATEGORIAS } from "@/constants/categories";
+import { formatMoneyInput } from "@/utils/formatters";
 
 const CARTEIRA_KEY = "finly_id_carteira";
 
@@ -26,7 +31,6 @@ interface Categoria {
 
 export default function TransactionFormScreen() {
   const { user } = useAuth();
-  // Parâmetros passados quando vem de edição (US03)
   const params = useLocalSearchParams<{
     id_transacao?: string;
     titulo?: string;
@@ -39,7 +43,6 @@ export default function TransactionFormScreen() {
 
   const isEditing = !!params.id_transacao;
 
-  // Campos do formulário
   const [titulo, setTitulo] = useState(params.titulo ?? "");
   const [valor, setValor] = useState(params.valor ?? "");
   const [tipo, setTipo] = useState<"RECEITA" | "DESPESA">(
@@ -56,18 +59,11 @@ export default function TransactionFormScreen() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Detecta tipo automaticamente pelo valor (US02)
   function handleValorChange(text: string) {
-    setValor(text);
-    const num = parseFloat(text.replace(",", "."));
-    if (!isNaN(num)) {
-      setTipo(num >= 0 ? "RECEITA" : "DESPESA");
-    }
+    setValor(formatMoneyInput(text));
   }
 
-  // Formata data digitada para YYYY-MM-DD
   function handleDataChange(text: string) {
-    // Aceita formato DD/MM/AAAA e converte
     const digits = text.replace(/\D/g, "");
     if (digits.length <= 8) {
       let formatted = digits;
@@ -81,9 +77,7 @@ export default function TransactionFormScreen() {
   }
 
   function parseDataToISO(input: string): string | null {
-    // Se já está em YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
-    // Se está em DD/MM/YYYY
     const parts = input.split("/");
     if (parts.length === 3 && parts[2].length === 4) {
       return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
@@ -97,16 +91,11 @@ export default function TransactionFormScreen() {
         const data = await apiRequest<Categoria[]>("/categorias");
         setCategorias(Array.isArray(data) ? data : []);
       } catch {
-        // Fallback com categorias do schema
-        setCategorias([
-          { id_categoria: 1, nome: "Alimentação", cor_hex: "#FF6B6B" },
-          { id_categoria: 2, nome: "Mercado", cor_hex: "#FF8787" },
-          { id_categoria: 5, nome: "Transporte", cor_hex: "#4D96FF" },
-          { id_categoria: 7, nome: "Saúde", cor_hex: "#FF4A4A" },
-          { id_categoria: 10, nome: "Lazer e Diversão", cor_hex: "#9D4EDD" },
-          { id_categoria: 17, nome: "Salário", cor_hex: "#118AB2" },
-          { id_categoria: 19, nome: "Renda Extra", cor_hex: "#2A9D8F" },
-        ]);
+        setCategorias(CATEGORIAS.map((cat) => ({
+          id_categoria: cat.id,
+          nome: cat.nome,
+          cor_hex: cat.cor,
+        })));
       } finally {
         setLoadingCats(false);
       }
@@ -114,15 +103,14 @@ export default function TransactionFormScreen() {
     loadCategorias();
   }, []);
 
-  // US11 — Validação de dados
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!titulo.trim()) errs.titulo = "Título é obrigatório";
-    const num = parseFloat(valor.replace(",", "."));
+    const num = parseFloat(valor.replace(/\./g, "").replace(",", "."));
     if (isNaN(num) || num === 0) errs.valor = "Insira um valor válido";
     if (!idCategoria) errs.categoria = "Selecione uma categoria";
     const dataISO = parseDataToISO(data);
-    if (!dataISO) errs.data = "Data inválida. Use DD/MM/AAAA";
+    if (!dataISO) errs.data = "Data inválida";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -134,9 +122,7 @@ export default function TransactionFormScreen() {
     setSaving(true);
     try {
       const dataISO = parseDataToISO(data)!;
-      const valorNum = Math.abs(parseFloat(valor.replace(",", ".")));
-
-      // Busca id_carteira salvo no onboarding ou usa padrão 1
+      const valorNum = Math.abs(parseFloat(valor.replace(/\./g, "").replace(",", ".")));
       const carteiraStored = await AsyncStorage.getItem(CARTEIRA_KEY);
       const idCarteira = carteiraStored ? Number(carteiraStored) : 1;
 
@@ -152,14 +138,12 @@ export default function TransactionFormScreen() {
       };
 
       if (isEditing) {
-        // US03 — Editar transação
         await apiRequest(`/transacoes/${params.id_transacao}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
         Alert.alert("Sucesso", "Transação atualizada!");
       } else {
-        // US02 — Cadastrar transação
         await apiRequest("/transacoes", {
           method: "POST",
           body: JSON.stringify(payload),
@@ -168,250 +152,395 @@ export default function TransactionFormScreen() {
       }
       router.back();
     } catch (err) {
-      Alert.alert(
-        "Erro",
-        err instanceof Error ? err.message : "Não foi possível salvar."
-      );
+      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível salvar.");
     } finally {
       setSaving(false);
     }
   }
+
+  const selectedCategory = categorias.find((c) => c.id_categoria === idCategoria);
+  const categoryIcon = CATEGORIAS.find((c) => c.nome === selectedCategory?.nome)?.icon || "tag";
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.select({ ios: "padding", default: undefined })}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+          <Feather name="x" size={24} color={Colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>
           {isEditing ? "Editar Transação" : "Nova Transação"}
         </Text>
+        <View style={styles.closeButton} />
+      </View>
 
-        {/* Tipo — RECEITA ou DESPESA */}
-        <Text style={styles.label}>TIPO</Text>
-        <View style={styles.tipoRow}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Tipo Toggle */}
+        <View style={styles.tipoContainer}>
           <Pressable
-            style={[styles.tipoBtn, tipo === "DESPESA" && styles.tipoBtnDespesa]}
+            style={[
+              styles.tipoButton,
+              tipo === "DESPESA" && styles.tipoButtonExpense,
+            ]}
             onPress={() => setTipo("DESPESA")}
           >
-            <Text style={[styles.tipoBtnText, tipo === "DESPESA" && styles.tipoBtnTextActive]}>
+            <Feather 
+              name="arrow-down-circle" 
+              size={20} 
+              color={tipo === "DESPESA" ? Colors.error : Colors.textMuted} 
+            />
+            <Text style={[
+              styles.tipoText,
+              tipo === "DESPESA" && styles.tipoTextExpense,
+            ]}>
               Despesa
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.tipoBtn, tipo === "RECEITA" && styles.tipoBtnReceita]}
+            style={[
+              styles.tipoButton,
+              tipo === "RECEITA" && styles.tipoButtonIncome,
+            ]}
             onPress={() => setTipo("RECEITA")}
           >
-            <Text style={[styles.tipoBtnText, tipo === "RECEITA" && styles.tipoBtnTextActive]}>
+            <Feather 
+              name="arrow-up-circle" 
+              size={20} 
+              color={tipo === "RECEITA" ? Colors.income : Colors.textMuted} 
+            />
+            <Text style={[
+              styles.tipoText,
+              tipo === "RECEITA" && styles.tipoTextIncome,
+            ]}>
               Receita
             </Text>
           </Pressable>
         </View>
 
-        {/* Título */}
-        <Text style={styles.label}>TÍTULO *</Text>
-        <TextInput
-          style={[styles.input, errors.titulo && styles.inputError]}
-          placeholder="Ex: Mercado, Salário..."
-          value={titulo}
-          onChangeText={setTitulo}
-        />
-        {errors.titulo && <Text style={styles.errorText}>{errors.titulo}</Text>}
-
         {/* Valor */}
-        <Text style={styles.label}>VALOR (R$) *</Text>
-        <TextInput
-          style={[styles.input, errors.valor && styles.inputError]}
-          placeholder="0,00"
-          keyboardType="numeric"
-          value={valor}
-          onChangeText={handleValorChange}
-        />
+        <View style={styles.valorContainer}>
+          <Text style={[
+            styles.valorPrefix,
+            { color: tipo === "DESPESA" ? Colors.error : Colors.income },
+          ]}>
+            {tipo === "DESPESA" ? "-" : "+"} R$
+          </Text>
+          <TextInput
+            style={[
+              styles.valorInput,
+              { color: tipo === "DESPESA" ? Colors.error : Colors.income },
+            ]}
+            placeholder="0,00"
+            placeholderTextColor={Colors.textMuted}
+            keyboardType="numeric"
+            value={valor}
+            onChangeText={handleValorChange}
+          />
+        </View>
         {errors.valor && <Text style={styles.errorText}>{errors.valor}</Text>}
 
+        {/* Título */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>DESCRIÇÃO</Text>
+          <View style={[styles.inputContainer, errors.titulo && styles.inputError]}>
+            <Feather name="edit-3" size={20} color={Colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: Mercado, Salário..."
+              placeholderTextColor={Colors.textMuted}
+              value={titulo}
+              onChangeText={setTitulo}
+            />
+          </View>
+          {errors.titulo && <Text style={styles.errorText}>{errors.titulo}</Text>}
+        </View>
+
         {/* Data */}
-        <Text style={styles.label}>DATA *</Text>
-        <TextInput
-          style={[styles.input, errors.data && styles.inputError]}
-          placeholder="DD/MM/AAAA"
-          keyboardType="numeric"
-          value={
-            // Se vier no formato ISO, converte para exibição
-            data.includes("-")
-              ? data.split("-").reverse().join("/")
-              : data
-          }
-          onChangeText={handleDataChange}
-          maxLength={10}
-        />
-        {errors.data && <Text style={styles.errorText}>{errors.data}</Text>}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>DATA</Text>
+          <View style={[styles.inputContainer, errors.data && styles.inputError]}>
+            <Feather name="calendar" size={20} color={Colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="DD/MM/AAAA"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              value={data.includes("-") ? data.split("-").reverse().join("/") : data}
+              onChangeText={handleDataChange}
+              maxLength={10}
+            />
+          </View>
+          {errors.data && <Text style={styles.errorText}>{errors.data}</Text>}
+        </View>
 
         {/* Categoria */}
-        <Text style={styles.label}>CATEGORIA *</Text>
-        {loadingCats ? (
-          <ActivityIndicator style={{ marginBottom: 16 }} />
-        ) : (
-          <>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>CATEGORIA</Text>
+          {loadingCats ? (
+            <ActivityIndicator style={{ marginVertical: Spacing.lg }} />
+          ) : (
             <View style={styles.categoriasGrid}>
-              {categorias.map((cat) => (
-                <Pressable
-                  key={cat.id_categoria}
-                  style={[
-                    styles.categoriaChip,
-                    idCategoria === cat.id_categoria && {
-                      backgroundColor: cat.cor_hex,
-                      borderColor: cat.cor_hex,
-                    },
-                  ]}
-                  onPress={() => setIdCategoria(cat.id_categoria)}
-                >
-                  <Text
+              {categorias.slice(0, 12).map((cat) => {
+                const catInfo = CATEGORIAS.find((c) => c.nome === cat.nome);
+                const isSelected = idCategoria === cat.id_categoria;
+                return (
+                  <Pressable
+                    key={cat.id_categoria}
                     style={[
-                      styles.categoriaChipText,
-                      idCategoria === cat.id_categoria && { color: "#FFFFFF" },
+                      styles.categoriaItem,
+                      isSelected && { 
+                        backgroundColor: (catInfo?.cor || cat.cor_hex) + "20",
+                        borderColor: catInfo?.cor || cat.cor_hex,
+                      },
                     ]}
-                    numberOfLines={1}
+                    onPress={() => setIdCategoria(cat.id_categoria)}
                   >
-                    {cat.nome}
-                  </Text>
-                </Pressable>
-              ))}
+                    <View style={[
+                      styles.categoriaIcon,
+                      { backgroundColor: (catInfo?.cor || cat.cor_hex) + "20" },
+                    ]}>
+                      <Feather 
+                        name={catInfo?.icon || "tag"} 
+                        size={18} 
+                        color={catInfo?.cor || cat.cor_hex} 
+                      />
+                    </View>
+                    <Text style={[
+                      styles.categoriaText,
+                      isSelected && { color: catInfo?.cor || cat.cor_hex, fontWeight: FontWeight.semibold },
+                    ]} numberOfLines={1}>
+                      {cat.nome}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            {errors.categoria && (
-              <Text style={styles.errorText}>{errors.categoria}</Text>
-            )}
-          </>
-        )}
+          )}
+          {errors.categoria && <Text style={styles.errorText}>{errors.categoria}</Text>}
+        </View>
+      </ScrollView>
 
-        {/* Botões */}
+      {/* Footer */}
+      <View style={styles.footer}>
         <Pressable
-          style={[styles.btnSalvar, saving && styles.btnDisabled]}
+          style={[styles.saveButton, saving && styles.buttonDisabled]}
           onPress={handleSalvar}
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator color="#FFF" />
+            <ActivityIndicator color={Colors.textInverse} />
           ) : (
-            <Text style={styles.btnSalvarText}>
-              {isEditing ? "Salvar Alterações" : "Salvar Transação"}
-            </Text>
+            <>
+              <Feather name="check" size={20} color={Colors.textInverse} />
+              <Text style={styles.saveButtonText}>
+                {isEditing ? "Salvar Alterações" : "Salvar Transação"}
+              </Text>
+            </>
           )}
         </Pressable>
 
-        <Pressable style={styles.btnCancelar} onPress={() => router.back()}>
-          <Text style={styles.btnCancelarText}>Cancelar</Text>
+        <Pressable style={styles.cancelButton} onPress={() => router.back()}>
+          <Text style={styles.cancelButtonText}>Cancelar</Text>
         </Pressable>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F7FB" },
-  content: { padding: 20, paddingBottom: 40 },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 24,
-    marginTop: 8,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 50,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxxl,
+  },
+  tipoContainer: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  tipoButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+  },
+  tipoButtonExpense: {
+    backgroundColor: Colors.expenseLight,
+    borderColor: Colors.expense,
+  },
+  tipoButtonIncome: {
+    backgroundColor: Colors.incomeLight,
+    borderColor: Colors.income,
+  },
+  tipoText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textMuted,
+  },
+  tipoTextExpense: {
+    color: Colors.expense,
+  },
+  tipoTextIncome: {
+    color: Colors.income,
+  },
+  valorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.xxl,
+    marginBottom: Spacing.lg,
+  },
+  valorPrefix: {
+    fontSize: 28,
+    fontWeight: FontWeight.bold,
+  },
+  valorInput: {
+    fontSize: 48,
+    fontWeight: FontWeight.bold,
+    textAlign: "center",
+    minWidth: 150,
+  },
+  inputGroup: {
+    marginBottom: Spacing.lg,
   },
   label: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748B",
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 16,
+    marginBottom: Spacing.sm,
   },
-  input: {
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    backgroundColor: "#FFFFFF",
-    color: "#0F172A",
+    borderColor: Colors.border,
   },
   inputError: {
-    borderColor: "#B91C1C",
+    borderColor: Colors.error,
+  },
+  inputIcon: {
+    marginRight: Spacing.sm,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: Spacing.lg,
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
   },
   errorText: {
-    color: "#B91C1C",
-    fontSize: 12,
-    marginTop: 4,
-  },
-  tipoRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 4,
-  },
-  tipoBtn: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  tipoBtnDespesa: {
-    backgroundColor: "#FEE2E2",
-    borderColor: "#B91C1C",
-  },
-  tipoBtnReceita: {
-    backgroundColor: "#DCFCE7",
-    borderColor: "#15803D",
-  },
-  tipoBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  tipoBtnTextActive: {
-    color: "#0F172A",
+    color: Colors.error,
+    fontSize: FontSize.xs,
+    marginTop: Spacing.xs,
   },
   categoriasGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 4,
+    gap: Spacing.sm,
   },
-  categoriaChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
-    maxWidth: "48%",
-  },
-  categoriaChipText: {
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: "500",
-  },
-  btnSalvar: {
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    padding: 16,
+  categoriaItem: {
+    width: "31%",
     alignItems: "center",
-    marginTop: 28,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
   },
-  btnDisabled: { opacity: 0.7 },
-  btnSalvarText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  btnCancelar: {
+  categoriaIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
-    padding: 14,
-    marginTop: 8,
+    justifyContent: "center",
+    marginBottom: Spacing.xs,
   },
-  btnCancelarText: {
-    color: "#64748B",
-    fontSize: 14,
+  categoriaText: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  footer: {
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxxl,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: Spacing.md,
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary,
+    ...Shadow.md,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textInverse,
+  },
+  cancelButton: {
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+  },
+  cancelButtonText: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
     textDecorationLine: "underline",
   },
 });

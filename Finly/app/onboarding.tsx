@@ -10,54 +10,58 @@ import {
   Text,
   TextInput,
   View,
+  ScrollView,
+  Dimensions,
+  StatusBar,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
+import { ProgressBar } from "@/components/ui";
+import { formatMoneyInput } from "@/utils/formatters";
 
 export const ONBOARDING_KEY = "finly_onboarding_done";
 export const RENDA_KEY = "finly_renda_mensal";
+export const LIMITE_KEY = "finly_limite_gastos";
 
-// Categorias padrão criadas automaticamente (US01)
-export const CATEGORIAS_PADRAO = [
-  "Alimentação",
-  "Mercado",
-  "Moradia",
-  "Contas Residenciais",
-  "Transporte",
-  "Combustível",
-  "Saúde",
-  "Farmácia",
-  "Educação",
-  "Lazer e Diversão",
-  "Bares e Restaurantes",
-  "Assinaturas e TV",
-  "Vestuário",
-  "Beleza e Cuidados",
-  "Pets",
-  "Viagem",
-  "Salário",
-  "Investimentos",
-  "Renda Extra",
-  "Transferências",
+const { width, height } = Dimensions.get("window");
+
+const QUICK_VALUES = [
+  { label: "R$ 1.500", value: 1500 },
+  { label: "R$ 3.000", value: 3000 },
+  { label: "R$ 5.000", value: 5000 },
+  { label: "R$ 8.000", value: 8000 },
+];
+
+const FEATURES = [
+  { icon: "pie-chart" as const, title: "Estatísticas", desc: "Visualize seus gastos" },
+  { icon: "target" as const, title: "Metas", desc: "Defina objetivos" },
+  { icon: "bell" as const, title: "Alertas", desc: "Nunca perca um prazo" },
 ];
 
 export default function OnboardingScreen() {
+  const [step, setStep] = useState(1);
   const [renda, setRenda] = useState("");
+  const [limite, setLimite] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function handleSalvar() {
-    const valor = renda.replace(/[^0-9,\.]/g, "").replace(",", ".");
-    const parsed = parseFloat(valor);
+  const totalSteps = 3;
+  const progress = (step / totalSteps) * 100;
 
-    if (isNaN(parsed) || parsed <= 0) {
+  async function handleSalvar() {
+    const rendaNum = parseFloat(renda.replace(/\./g, "").replace(",", ".")) || 0;
+    const limiteNum = parseFloat(limite.replace(/\./g, "").replace(",", ".")) || 0;
+
+    if (rendaNum <= 0) {
       Alert.alert("Valor inválido", "Por favor, insira uma renda mensal válida.");
       return;
     }
 
     setSaving(true);
     try {
-      // Armazena renda e marca onboarding como concluído (US01)
-      await AsyncStorage.setItem(RENDA_KEY, String(parsed));
+      await AsyncStorage.setItem(RENDA_KEY, String(rendaNum));
+      await AsyncStorage.setItem(LIMITE_KEY, String(limiteNum || rendaNum * 0.7));
       await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-      // Categorias padrão já existem no banco (seed do schema.sql)
       router.replace("/(tabs)");
     } catch {
       Alert.alert("Erro", "Não foi possível salvar as informações.");
@@ -67,9 +71,22 @@ export default function OnboardingScreen() {
   }
 
   async function handlePular() {
-    // Opção de pular a configuração inicial (US01)
     await AsyncStorage.setItem(ONBOARDING_KEY, "true");
     router.replace("/(tabs)");
+  }
+
+  function handleNext() {
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
+      handleSalvar();
+    }
+  }
+
+  function handleBack() {
+    if (step > 1) {
+      setStep(step - 1);
+    }
   }
 
   return (
@@ -77,39 +94,187 @@ export default function OnboardingScreen() {
       style={styles.container}
       behavior={Platform.select({ ios: "padding", default: undefined })}
     >
-      <View style={styles.card}>
-        <Text style={styles.logo}>Finly</Text>
-        <Text style={styles.title}>Bem-vindo ao Finly!</Text>
-        <Text style={styles.subtitle}>
-          Para começar, precisamos de uma informação básica.
-        </Text>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header */}
+      <LinearGradient
+        colors={[Colors.primary, Colors.primaryDark]}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.logoRow}>
+            <View style={styles.logoCircle}>
+              <Feather name="dollar-sign" size={24} color={Colors.primary} />
+            </View>
+            <Text style={styles.logoText}>Finly</Text>
+          </View>
+          
+          {/* Progress */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressInfo}>
+              <Text style={styles.stepText}>Etapa {step} de {totalSteps}</Text>
+              <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
+            </View>
+            <ProgressBar 
+              progress={progress} 
+              color={Colors.textInverse}
+              backgroundColor="rgba(255,255,255,0.3)"
+              height={6}
+            />
+          </View>
+        </View>
+      </LinearGradient>
 
-        <Text style={styles.label}>QUAL SUA RENDA MENSAL ATUAL?</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="R$ 0,00"
-          keyboardType="numeric"
-          value={renda}
-          onChangeText={setRenda}
-          autoFocus
-        />
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Step 1: Boas-vindas */}
+        {step === 1 && (
+          <View style={styles.stepContent}>
+            <View style={styles.welcomeIcon}>
+              <Feather name="smile" size={48} color={Colors.primary} />
+            </View>
+            <Text style={styles.title}>Bem-vindo ao Finly!</Text>
+            <Text style={styles.subtitle}>
+              Vamos configurar sua conta em poucos passos para você ter o controle total das suas finanças.
+            </Text>
 
-        <Text style={styles.categoriesNote}>
-          ✓ Categorias padrão serão criadas automaticamente
-        </Text>
+            {/* Features */}
+            <View style={styles.featuresGrid}>
+              {FEATURES.map((feature, index) => (
+                <View key={index} style={styles.featureCard}>
+                  <View style={[styles.featureIcon, { backgroundColor: Colors.primary + "15" }]}>
+                    <Feather name={feature.icon} size={24} color={Colors.primary} />
+                  </View>
+                  <Text style={styles.featureTitle}>{feature.title}</Text>
+                  <Text style={styles.featureDesc}>{feature.desc}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
-        <Pressable
-          style={[styles.btnPrimary, saving && styles.btnDisabled]}
-          onPress={handleSalvar}
-          disabled={saving}
-        >
-          <Text style={styles.btnPrimaryText}>
-            {saving ? "Salvando..." : "Salvar e Continuar"}
-          </Text>
-        </Pressable>
+        {/* Step 2: Renda Mensal */}
+        {step === 2 && (
+          <View style={styles.stepContent}>
+            <View style={styles.stepIcon}>
+              <Feather name="trending-up" size={32} color={Colors.primary} />
+            </View>
+            <Text style={styles.title}>Qual sua renda mensal?</Text>
+            <Text style={styles.subtitle}>
+              Isso nos ajuda a criar metas personalizadas para você.
+            </Text>
 
-        <Pressable style={styles.btnSkip} onPress={handlePular}>
-          <Text style={styles.btnSkipText}>Pular configuração</Text>
+            <View style={styles.inputLarge}>
+              <Text style={styles.currencyPrefix}>R$</Text>
+              <TextInput
+                style={styles.largeInput}
+                placeholder="0,00"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+                value={renda}
+                onChangeText={(text) => setRenda(formatMoneyInput(text))}
+                autoFocus
+              />
+            </View>
+
+            {/* Quick Values */}
+            <View style={styles.quickValues}>
+              {QUICK_VALUES.map((item) => (
+                <Pressable
+                  key={item.value}
+                  style={[
+                    styles.quickValueBtn,
+                    renda === item.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) && styles.quickValueBtnActive,
+                  ]}
+                  onPress={() => setRenda(item.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 }))}
+                >
+                  <Text style={[
+                    styles.quickValueText,
+                    renda === item.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) && styles.quickValueTextActive,
+                  ]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Step 3: Limite de Gastos */}
+        {step === 3 && (
+          <View style={styles.stepContent}>
+            <View style={styles.stepIcon}>
+              <Feather name="shield" size={32} color={Colors.primary} />
+            </View>
+            <Text style={styles.title}>Defina seu limite mensal</Text>
+            <Text style={styles.subtitle}>
+              Vamos te alertar quando você estiver chegando perto do limite.
+            </Text>
+
+            <View style={styles.inputLarge}>
+              <Text style={styles.currencyPrefix}>R$</Text>
+              <TextInput
+                style={styles.largeInput}
+                placeholder="0,00"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+                value={limite}
+                onChangeText={(text) => setLimite(formatMoneyInput(text))}
+                autoFocus
+              />
+            </View>
+
+            {/* Sugestão */}
+            <View style={styles.suggestionCard}>
+              <Feather name="info" size={20} color={Colors.info} />
+              <View style={styles.suggestionContent}>
+                <Text style={styles.suggestionTitle}>Dica</Text>
+                <Text style={styles.suggestionText}>
+                  Recomendamos um limite de 70% da sua renda para gastos variáveis.
+                </Text>
+              </View>
+            </View>
+
+            {/* Categorias */}
+            <View style={styles.categoriesPreview}>
+              <Text style={styles.categoriesTitle}>
+                <Feather name="check-circle" size={16} color={Colors.success} /> Categorias padrão criadas
+              </Text>
+              <Text style={styles.categoriesText}>
+                Alimentação, Transporte, Saúde, Lazer, Moradia e mais...
+              </Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Footer */}
+      <View style={styles.footer}>
+        <View style={styles.footerButtons}>
+          {step > 1 && (
+            <Pressable style={styles.backButton} onPress={handleBack}>
+              <Feather name="arrow-left" size={20} color={Colors.textSecondary} />
+              <Text style={styles.backButtonText}>Voltar</Text>
+            </Pressable>
+          )}
+          
+          <Pressable
+            style={[styles.nextButton, saving && styles.buttonDisabled]}
+            onPress={handleNext}
+            disabled={saving}
+          >
+            <Text style={styles.nextButtonText}>
+              {step === totalSteps ? (saving ? "Salvando..." : "Começar") : "Continuar"}
+            </Text>
+            <Feather name={step === totalSteps ? "check" : "arrow-right"} size={20} color={Colors.textInverse} />
+          </Pressable>
+        </View>
+
+        <Pressable style={styles.skipButton} onPress={handlePular}>
+          <Text style={styles.skipButtonText}>Pular configuração</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -119,83 +284,275 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7FB",
-    justifyContent: "center",
-    padding: 20,
+    backgroundColor: Colors.background,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
+  header: {
+    paddingTop: 50,
+    paddingBottom: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+  },
+  headerContent: {
+    gap: Spacing.lg,
+  },
+  logoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  logoCircle: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    padding: 28,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    backgroundColor: Colors.textInverse,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  logo: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#2563EB",
-    marginBottom: 16,
+  logoText: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: Colors.textInverse,
+  },
+  progressContainer: {
+    gap: Spacing.sm,
+  },
+  progressInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  stepText: {
+    fontSize: FontSize.sm,
+    color: Colors.textInverse,
+    opacity: 0.9,
+  },
+  progressPercent: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.textInverse,
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: Spacing.xl,
+  },
+  stepContent: {
+    alignItems: "center",
+  },
+  welcomeIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary + "15",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.xl,
+  },
+  stepIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.primary + "15",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 8,
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    textAlign: "center",
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 28,
+    fontSize: FontSize.md,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: Spacing.xxl,
+  },
+  featuresGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.md,
+    width: "100%",
+  },
+  featureCard: {
+    width: (width - Spacing.xl * 2 - Spacing.md * 2) / 3,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
+  },
+  featureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.sm,
+  },
+  featureTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  featureDesc: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
+  inputLarge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    width: "100%",
+    marginBottom: Spacing.xl,
+    ...Shadow.md,
+  },
+  currencyPrefix: {
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold,
+    color: Colors.primary,
+    marginRight: Spacing.sm,
+  },
+  largeInput: {
+    flex: 1,
+    fontSize: 32,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  quickValues: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    width: "100%",
+  },
+  quickValueBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  quickValueBtnActive: {
+    backgroundColor: Colors.primary + "15",
+    borderColor: Colors.primary,
+  },
+  quickValueText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    color: Colors.textSecondary,
+  },
+  quickValueTextActive: {
+    color: Colors.primary,
+    fontWeight: FontWeight.semibold,
+  },
+  suggestionCard: {
+    flexDirection: "row",
+    backgroundColor: Colors.infoLight,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    width: "100%",
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  suggestionContent: {
+    flex: 1,
+  },
+  suggestionTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.info,
+    marginBottom: 2,
+  },
+  suggestionText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748B",
-    letterSpacing: 0.5,
-    marginBottom: 8,
+  categoriesPreview: {
+    backgroundColor: Colors.successLight,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    width: "100%",
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#0F172A",
-    backgroundColor: "#F8FAFC",
-    marginBottom: 16,
+  categoriesTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.success,
+    marginBottom: Spacing.xs,
   },
-  categoriesNote: {
-    fontSize: 13,
-    color: "#15803D",
-    marginBottom: 24,
+  categoriesText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
   },
-  btnPrimary: {
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    padding: 16,
+  footer: {
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxxl,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  footerButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  backButton: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: Spacing.sm,
   },
-  btnDisabled: {
+  backButtonText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textSecondary,
+  },
+  nextButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary,
+    gap: Spacing.sm,
+    ...Shadow.md,
+  },
+  buttonDisabled: {
     opacity: 0.7,
   },
-  btnPrimaryText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+  nextButtonText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textInverse,
   },
-  btnSkip: {
+  skipButton: {
     alignItems: "center",
-    padding: 8,
+    paddingVertical: Spacing.sm,
   },
-  btnSkipText: {
-    color: "#64748B",
-    fontSize: 14,
+  skipButtonText: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
     textDecorationLine: "underline",
   },
 });
