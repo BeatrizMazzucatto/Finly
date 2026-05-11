@@ -1,49 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../database/connection");
+const pool = require("../database/connection");
 
-const FALLBACK_TRANSACTIONS = [
-  {
-    id_transacao: 1,
-    titulo: "Salário",
-    tipo: "RECEITA",
-    valor: 3500.0,
-    data_transacao: "2026-04-01",
-    categoria: "Salário",
-  },
-  {
-    id_transacao: 2,
-    titulo: "Mercado",
-    tipo: "DESPESA",
-    valor: 320.45,
-    data_transacao: "2026-04-10",
-    categoria: "Mercado",
-  },
-  {
-    id_transacao: 3,
-    titulo: "Uber",
-    tipo: "DESPESA",
-    valor: 35.0,
-    data_transacao: "2026-04-12",
-    categoria: "Transporte",
-  },
-  {
-    id_transacao: 4,
-    titulo: "Farmácia",
-    tipo: "DESPESA",
-    valor: 89.9,
-    data_transacao: "2026-04-15",
-    categoria: "Farmácia",
-  },
-  {
-    id_transacao: 5,
-    titulo: "Spotify",
-    tipo: "DESPESA",
-    valor: 21.9,
-    data_transacao: "2026-04-18",
-    categoria: "Assinaturas e TV",
-  },
-];
+
 
 // CRIAR TRANSAÇÃO
 router.post("/", (req, res) => {
@@ -75,10 +34,11 @@ router.post("/", (req, res) => {
   const sql = `
     INSERT INTO transacoes
     (id_carteira, id_usuario, id_categoria, titulo, descricao, tipo, valor, data_transacao, forma_pagamento, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    RETURNING id_transacao
   `;
 
-  db.query(
+  pool.query(
     sql,
     [
       id_carteira,
@@ -99,7 +59,7 @@ router.post("/", (req, res) => {
       }
       res.status(201).json({
         mensagem: "Transação criada com sucesso",
-        id_transacao: result.insertId,
+        id_transacao: result.rows[0].id_transacao,
       });
     }
   );
@@ -110,48 +70,45 @@ router.get("/:id_usuario", (req, res) => {
   const { id_usuario } = req.params;
   const { categoria, data_inicio, data_fim } = req.query;
 
+  let paramCount = 1;
   let sql = `
     SELECT
       t.id_transacao,
       t.titulo,
       t.tipo,
       t.valor,
-      DATE_FORMAT(t.data_transacao, '%Y-%m-%d') AS data_transacao,
+      TO_CHAR(t.data_transacao, 'YYYY-MM-DD') AS data_transacao,
       c.nome AS categoria
     FROM transacoes t
     LEFT JOIN categorias c ON t.id_categoria = c.id_categoria
-    WHERE t.id_usuario = ?
+    WHERE t.id_usuario = $${paramCount++}
   `;
 
   const params = [id_usuario];
 
   if (categoria) {
-    sql += " AND c.nome = ?";
+    sql += ` AND c.nome = $${paramCount++}`;
     params.push(categoria);
   }
 
   if (data_inicio && data_fim) {
-    sql += " AND t.data_transacao BETWEEN ? AND ?";
+    sql += ` AND t.data_transacao BETWEEN $${paramCount++} AND $${paramCount++}`;
     params.push(data_inicio, data_fim);
   }
 
   sql += " ORDER BY t.data_transacao DESC";
 
-  db.query(sql, params, (err, results) => {
+  pool.query(sql, params, (err, result) => {
     if (err) {
       console.error("Erro ao buscar transações:", err);
-      // Fallback para ambiente sem MySQL
-      if (Number(id_usuario) === 1) {
-        return res.json(FALLBACK_TRANSACTIONS);
-      }
       return res.status(500).json({ erro: "Erro ao buscar transações" });
     }
 
-    if (!results || results.length === 0) {
+    if (!result || result.rows.length === 0) {
       return res.json({ mensagem: "Nenhuma transação encontrada" });
     }
 
-    res.json(results);
+    res.json(result.rows);
   });
 });
 
@@ -170,11 +127,11 @@ router.put("/:id", (req, res) => {
 
   const sql = `
     UPDATE transacoes
-    SET titulo = ?, valor = ?, tipo = ?, id_categoria = ?, data_transacao = ?, descricao = ?, forma_pagamento = ?, status = ?
-    WHERE id_transacao = ?
+    SET titulo = $1, valor = $2, tipo = $3, id_categoria = $4, data_transacao = $5, descricao = $6, forma_pagamento = $7, status = $8
+    WHERE id_transacao = $9
   `;
 
-  db.query(
+  pool.query(
     sql,
     [titulo, Number(valor), tipo, id_categoria ?? null, data_transacao, descricao ?? null, forma_pagamento ?? null, status ?? "PAGO", id],
     (err, result) => {
@@ -182,7 +139,7 @@ router.put("/:id", (req, res) => {
         console.error("Erro ao atualizar transação:", err);
         return res.status(500).json({ erro: "Erro ao atualizar transação" });
       }
-      if (result.affectedRows === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ erro: "Transação não encontrada" });
       }
       res.json({ mensagem: "Transação atualizada com sucesso" });
@@ -198,12 +155,12 @@ router.delete("/:id", (req, res) => {
     return res.status(400).json({ erro: "ID inválido" });
   }
 
-  db.query("DELETE FROM transacoes WHERE id_transacao = ?", [id], (err, result) => {
+  pool.query("DELETE FROM transacoes WHERE id_transacao = $1", [id], (err, result) => {
     if (err) {
       console.error("Erro ao excluir transação:", err);
       return res.status(500).json({ erro: "Erro ao excluir transação" });
     }
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ erro: "Transação não encontrada" });
     }
     res.json({ mensagem: "Transação excluída com sucesso" });

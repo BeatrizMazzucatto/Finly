@@ -1,22 +1,20 @@
-const mysql = require("mysql2");
+const { Pool } = require("pg");
 
-const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "senha",
-  database: "finly_db",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+// Configurando o Pool para o Supabase (PostgreSQL)
+const pool = new Pool({
+  connectionString: "postgres://postgres:Y3FkvdFiymFRgpwj@db.lfevhjfwicqxqagrlxws.supabase.co:5432/postgres",
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-pool.getConnection((err, connection) => {
+// Testando a conexão
+pool.connect((err, client, release) => {
   if (err) {
-    console.error("Erro ao conectar no MySQL:", err.message);
-    return;
+    return console.error("Erro ao conectar no PostgreSQL (Supabase):", err.message);
   }
-  console.log("MySQL conectado!");
-  connection.release();
+  console.log("Conectado ao Supabase (PostgreSQL)!");
+  release();
 });
 
 module.exports = pool;
