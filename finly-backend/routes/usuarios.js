@@ -2,12 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../database/connection");
 
-const FALLBACK_USER = {
-  id_usuario: 1,
-  nome: "Julia",
-  email: "julia@finly.com",   
-  senha_hash: "hash_senha_123",
-};
+
 
 // POST /usuarios/login
 router.post("/login", (req, res) => {
@@ -20,32 +15,21 @@ router.post("/login", (req, res) => {
   const sql = `
     SELECT id_usuario, nome, email, senha_hash
     FROM usuarios
-    WHERE email = ?
+    WHERE email = $1
     LIMIT 1
   `;
 
-  db.query(sql, [email.trim().toLowerCase()], (err, results) => {
+  db.query(sql, [email.trim().toLowerCase()], (err, result) => {
     if (err) {
       console.error("Erro ao autenticar:", err);
-      // Fallback para ambiente sem MySQL
-      if (
-        email.trim().toLowerCase() === FALLBACK_USER.email &&
-        senha === FALLBACK_USER.senha_hash
-      ) {
-        return res.json({
-          id_usuario: FALLBACK_USER.id_usuario,
-          nome: FALLBACK_USER.nome,
-          email: FALLBACK_USER.email,
-        });
-      }
       return res.status(500).json({ erro: "Erro ao autenticar usuário" });
     }
 
-    if (!results || results.length === 0) {
+    if (!result || result.rows.length === 0) {
       return res.status(401).json({ erro: "Credenciais inválidas" });
     }
 
-    const usuario = results[0];
+    const usuario = result.rows[0];
 
     // Comparação direta — substituir por bcrypt em produção
     if (usuario.senha_hash !== senha) {
@@ -70,7 +54,7 @@ router.post("/", (req, res) => {
 
   const sql = `
     INSERT INTO usuarios (nome, email, senha_hash)
-    VALUES (?, ?, ?)
+    VALUES ($1, $2, $3) RETURNING id_usuario
   `;
 
   db.query(sql, [nome, email.trim().toLowerCase(), senha], (err, result) => {
@@ -84,7 +68,7 @@ router.post("/", (req, res) => {
 
     return res.status(201).json({
       mensagem: "Usuário criado com sucesso",
-      id_usuario: result.insertId,
+      id_usuario: result.rows[0].id_usuario,
     });
   });
 });

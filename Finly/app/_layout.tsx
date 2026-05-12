@@ -1,13 +1,42 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import "react-native-reanimated";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AuthProvider } from '@/src/context/AuthContext';
+import { PhoneShell } from "@/components/PhoneShell";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { AuthProvider } from "@/src/context/AuthContext";
+import { Colors } from "@/constants/theme";
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: "(tabs)",
+};
+
+// Tema personalizado Finly
+const FinlyLightTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: Colors.primary,
+    background: Colors.background,
+    card: Colors.surface,
+    text: Colors.textPrimary,
+    border: Colors.border,
+    notification: Colors.error,
+  },
+};
+
+const FinlyDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: Colors.primary,
+    background: "#0F172A",
+    card: "#1E293B",
+    text: "#F8FAFC",
+    border: "#334155",
+    notification: Colors.error,
+  },
 };
 
 export default function RootLayout() {
@@ -15,26 +44,24 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="transaction-form"
-            options={{
-              presentation: 'modal',
-              title: 'Transação',
-              headerShown: true,
-              headerStyle: { backgroundColor: '#F5F7FB' },
-              headerTintColor: '#2563EB',
-              headerTitleStyle: { fontWeight: '700', color: '#0F172A' },
-            }}
-          />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <PhoneShell>
+        <ThemeProvider value={colorScheme === "dark" ? FinlyDarkTheme : FinlyLightTheme}>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="transaction-form"
+              options={{
+                presentation: "modal",
+                headerShown: false,
+              }}
+            />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </PhoneShell>
     </AuthProvider>
   );
 }

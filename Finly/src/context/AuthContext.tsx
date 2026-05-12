@@ -6,8 +6,14 @@ import type { User } from "@/src/types/api";
 
 const AUTH_STORAGE_KEY = "finly_auth_user";
 
+export const GUEST_USER: User = {
+  id_usuario: 1,
+  nome: "Lucas Silva",
+  email: "lucas.silva@email.com",
+};
+
 interface AuthContextValue {
-  user: User | null;
+  user: User;
   loading: boolean;
   login: (email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -16,7 +22,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User>(GUEST_USER);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,15 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       login: async (email: string, senha: string) => {
         const authenticatedUser = await loginService({ email, senha });
-        await AsyncStorage.setItem(
-          AUTH_STORAGE_KEY,
-          JSON.stringify(authenticatedUser)
-        );
+        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authenticatedUser));
         setUser(authenticatedUser);
       },
       logout: async () => {
         await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-        setUser(null);
+        setUser(GUEST_USER);
       },
     }),
     [loading, user]

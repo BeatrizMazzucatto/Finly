@@ -1,66 +1,140 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  StatusBar,
 } from "react-native";
 import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+import Svg, { Circle } from "react-native-svg";
 
 import { useAuth } from "@/src/context/AuthContext";
-import { apiRequest } from "@/src/services/api";
 import { getTransactionsByUser } from "@/src/services/transactions";
 import type { Transaction } from "@/src/types/api";
-import TransactionFilters from "@/src/components/TransactionFilters";
-import SpendingLimitCard from "@/src/components/SpendingLimitCard";
+import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
+import { formatCurrency } from "@/utils/formatters";
+import { getCategoryColor, getCategoryIcon } from "@/constants/categories";
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
+type WalletMode = "personal" | "joint";
+
+const CATEGORY_PALETTE = [
+  { bg: Colors.categories.alimentacao, icon: Colors.categoryIcons.alimentacao },
+  { bg: Colors.categories.transporte, icon: Colors.categoryIcons.transporte },
+  { bg: Colors.categories.saude, icon: Colors.categoryIcons.saude },
+  { bg: Colors.categories.lazer, icon: Colors.categoryIcons.lazer },
+];
+
+function formatTime(dateStr: string) {
+  const date = new Date(`${dateStr}T12:00:00`);
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return "";
-  const [year, month, day] = dateStr.split("-");
-  return `${day}/${month}/${year}`;
+function DonutChart({ total }: { total: number }) {
+  const size = 200;
+  const stroke = 25;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const segments = [0.4, 0.3, 0.2, 0.1];
+  const colors = [
+    Colors.categories.alimentacao,
+    Colors.categories.transporte,
+    Colors.categories.saude,
+    Colors.categories.lazer,
+  ];
+
+  let offset = 0;
+
+  return (
+    <View style={styles.chartRing}>
+      <Svg width={size} height={size}>
+        {segments.map((value, index) => {
+          const dash = circumference * value;
+          const circle = (
+            <Circle
+              key={index}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={colors[index]}
+              strokeWidth={stroke}
+              fill="transparent"
+              strokeDasharray={`${dash} ${circumference - dash}`}
+              strokeDashoffset={-offset}
+              rotation={-90}
+              origin={`${size / 2}, ${size / 2}`}
+            />
+          );
+          offset += dash;
+          return circle;
+        })}
+      </Svg>
+      <View style={styles.chartCenter}>
+        <Text style={styles.chartCenterLabel}>Despesas</Text>
+        <Text style={styles.chartCenterValue}>{formatCurrency(total)}</Text>
+      </View>
+    </View>
+  );
 }
 
-export default function DashboardScreen() {
+export default function HomeScreen() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [walletMode, setWalletMode] = useState<WalletMode>("personal");
 
-  const totalReceitas = useMemo(
-    () => transactions.filter((t) => t.tipo === "RECEITA").reduce((a, t) => a + Number(t.valor), 0),
+  const despesas = useMemo(
+    () => transactions.filter((t) => t.tipo === "DESPESA"),
+    [transactions]
+  );
+  const receitas = useMemo(
+    () => transactions.filter((t) => t.tipo === "RECEITA"),
     [transactions]
   );
   const totalDespesas = useMemo(
-    () => transactions.filter((t) => t.tipo === "DESPESA").reduce((a, t) => a + Number(t.valor), 0),
-    [transactions]
+    () => despesas.reduce((sum, item) => sum + Number(item.valor), 0),
+    [despesas]
+  );
+  const totalReceitas = useMemo(
+    () => receitas.reduce((sum, item) => sum + Number(item.valor), 0),
+    [receitas]
   );
   const saldo = totalReceitas - totalDespesas;
 
-  async function loadTransactions(isPullToRefresh = false) {
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    despesas.forEach((item) => {
+      const key = item.categoria ?? "Outros";
+      totals.set(key, (totals.get(key) ?? 0) + Number(item.valor));
+    });
+    return Array.from(totals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+  }, [despesas]);
+
+  const recentTransactions = useMemo(
+    () =>
+      [...transactions].sort(
+        (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
+      ).slice(0, 4),
+    [transactions]
+  );
+
+  async function loadData(isPullToRefresh = false) {
     if (!user) return;
     try {
       setError(null);
       if (isPullToRefresh) setRefreshing(true);
       else setLoading(true);
       const data = await getTransactionsByUser(user.id_usuario);
-      const sorted = [...data].sort(
-        (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
-      );
-      setTransactions(sorted);
-      setFilteredTransactions(sorted);
+      setTransactions(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
@@ -70,157 +144,359 @@ export default function DashboardScreen() {
   }
 
   useEffect(() => {
-    loadTransactions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadData();
   }, [user?.id_usuario]);
 
-  const handleFilterChange = useCallback((filtered: Transaction[]) => {
-    setFilteredTransactions(filtered);
-  }, []);
-
-  function handleEdit(item: Transaction) {
-    router.push({
-      pathname: "/transaction-form",
-      params: {
-        id_transacao: String(item.id_transacao),
-        titulo: item.titulo,
-        valor: String(item.valor),
-        tipo: item.tipo,
-        categoria_nome: item.categoria ?? "",
-        data_transacao: item.data_transacao,
-      },
-    });
-  }
-
-  function handleDelete(item: Transaction) {
-    Alert.alert(
-      "Excluir transação",
-      `Deseja excluir "${item.titulo}"?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
-              await loadTransactions();
-            } catch (err) {
-              Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
-            }
-          },
-        },
-      ]
-    );
-  }
+  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.nome ?? "User")}&background=4F46E5&color=fff`;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTransactions(true)} />}
-    >
-      <Text style={styles.header}>Resumo financeiro</Text>
-      <Text style={styles.greeting}>Olá, {user?.nome ?? "usuário"}. 👋</Text>
-
-      <View style={styles.cardsRow}>
-        <View style={[styles.card, styles.cardFlex]}>
-          <Text style={styles.cardLabel}>Saldo</Text>
-          <Text style={[styles.cardValue, { color: saldo >= 0 ? "#15803D" : "#B91C1C" }]}>
-            {formatCurrency(saldo)}
-          </Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          <View>
+            <Text style={styles.headerGreeting}>Olá, de novo!</Text>
+            <Text style={styles.headerName}>{user?.nome ?? "Usuário"}</Text>
+          </View>
         </View>
-        <View style={[styles.card, styles.cardFlex]}>
-          <Text style={styles.cardLabel}>Receitas</Text>
-          <Text style={[styles.cardValue, { color: "#15803D" }]}>{formatCurrency(totalReceitas)}</Text>
-        </View>
-      </View>
-      <View style={[styles.card, { marginBottom: 12 }]}>
-        <Text style={styles.cardLabel}>Despesas</Text>
-        <Text style={[styles.cardValue, { color: "#B91C1C" }]}>{formatCurrency(totalDespesas)}</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>Limite de Gastos</Text>
-      <SpendingLimitCard totalDespesas={totalDespesas} />
-
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Transações</Text>
-        <Pressable style={styles.btnNova} onPress={() => router.push("/transaction-form")}>
-          <Text style={styles.btnNovaText}>+ Nova</Text>
+        <Pressable style={styles.bellButton}>
+          <Feather name="bell" size={18} color={Colors.textPrimary} />
         </Pressable>
       </View>
 
-      <TransactionFilters transactions={transactions} onFilterChange={handleFilterChange} />
-
-      {loading ? (
-        <ActivityIndicator size="large" style={{ marginTop: 24 }} />
-      ) : error ? (
-        <Text style={styles.error}>{error}</Text>
-      ) : filteredTransactions.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Nenhuma transação encontrada.</Text>
-          <Pressable style={styles.btnEmptyAdd} onPress={() => router.push("/transaction-form")}>
-            <Text style={styles.btnEmptyAddText}>Cadastrar primeira transação</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.walletToggle}>
+          <Pressable
+            style={[styles.toggleButton, walletMode === "personal" && styles.toggleButtonActivePersonal]}
+            onPress={() => setWalletMode("personal")}
+          >
+            <Text style={[styles.toggleText, walletMode === "personal" && styles.toggleTextActivePersonal]}>
+              Minha Carteira
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.toggleButton, walletMode === "joint" && styles.toggleButtonActiveJoint]}
+            onPress={() => setWalletMode("joint")}
+          >
+            <Text style={[styles.toggleText, walletMode === "joint" && styles.toggleTextActiveJoint]}>
+              Carteira Conjunta
+            </Text>
           </Pressable>
         </View>
-      ) : (
-        filteredTransactions.map((item) => (
-          <View key={item.id_transacao} style={styles.transactionItem}>
-            <View style={[styles.badge, { backgroundColor: item.tipo === "DESPESA" ? "#FEE2E2" : "#DCFCE7" }]}>
-              <Text style={styles.badgeText}>{item.tipo === "DESPESA" ? "↓" : "↑"}</Text>
+
+        <View style={styles.balanceContainer}>
+          <Text style={styles.balanceLabel}>Saldo Disponível</Text>
+          <Text style={styles.balanceValue}>{formatCurrency(saldo)}</Text>
+        </View>
+
+        <DonutChart total={totalDespesas} />
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Gastos por Categoria</Text>
+          <Pressable onPress={() => router.push("/(tabs)/history")}>
+            <Text style={styles.sectionLink}>Ver tudo</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+          {categoryTotals.length === 0 ? (
+            <View style={[styles.categoryCard, { backgroundColor: Colors.categories.outros }]}>
+              <View style={[styles.categoryIcon, { backgroundColor: Colors.surface }]}>
+                <Feather name="tag" size={18} color={Colors.categoryIcons.outros} />
+              </View>
+              <Text style={styles.categoryName}>Sem gastos</Text>
+              <Text style={styles.categoryValue}>R$ 0,00</Text>
             </View>
-            <View style={styles.transactionInfo}>
-              <Text style={styles.transactionTitle}>{item.titulo}</Text>
-              <Text style={styles.transactionMeta}>
-                {item.categoria ?? "Sem categoria"} • {formatDate(item.data_transacao)}
-              </Text>
-            </View>
-            <Text style={[styles.transactionValue, { color: item.tipo === "DESPESA" ? "#B91C1C" : "#15803D" }]}>
-              {item.tipo === "DESPESA" ? "-" : "+"}{formatCurrency(Number(item.valor))}
-            </Text>
-            <View style={styles.actions}>
-              <Pressable onPress={() => handleEdit(item)} style={styles.actionBtn}>
-                <Text style={styles.actionEdit}>✏️</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDelete(item)} style={styles.actionBtn}>
-                <Text style={styles.actionDelete}>🗑️</Text>
-              </Pressable>
-            </View>
+          ) : (
+            categoryTotals.map(([nome, total], index) => {
+              const palette = CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
+              const icon = getCategoryIcon(nome);
+              return (
+                <View key={nome} style={[styles.categoryCard, { backgroundColor: palette.bg }]}>
+                  <View style={[styles.categoryIcon, { backgroundColor: Colors.surface }]}>
+                    <Feather name={icon} size={18} color={palette.icon} />
+                  </View>
+                  <Text style={styles.categoryName}>{nome}</Text>
+                  <Text style={styles.categoryValue}>{formatCurrency(total)}</Text>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        <View style={[styles.sectionHeader, { marginTop: Spacing.xxl }]}>
+          <Text style={styles.sectionTitle}>Transações Recentes</Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: Spacing.xxl }} />
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
           </View>
-        ))
-      )}
-    </ScrollView>
+        ) : recentTransactions.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Nenhuma transação recente.</Text>
+          </View>
+        ) : (
+          recentTransactions.map((item) => {
+            const isExpense = item.tipo === "DESPESA";
+            const icon = getCategoryIcon(item.categoria ?? "Outros");
+            const bg = getCategoryColor(item.categoria ?? "Outros");
+            return (
+              <View key={item.id_transacao} style={styles.txItem}>
+                <View style={[styles.txIcon, { backgroundColor: bg }]}>
+                  <Feather name={icon} size={20} color={Colors.textPrimary} />
+                </View>
+                <View style={styles.txInfo}>
+                  <Text style={styles.txTitle}>{item.titulo}</Text>
+                  <Text style={styles.txMeta}>
+                    {item.categoria ?? "Sem categoria"} • {formatTime(item.data_transacao)}
+                  </Text>
+                </View>
+                <Text style={[styles.txValue, !isExpense && styles.txValuePositive]}>
+                  {isExpense ? "- " : "+ "}
+                  {formatCurrency(Number(item.valor))}
+                </Text>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F7FB" },
-  content: { padding: 16, paddingTop: 24, paddingBottom: 36, gap: 8 },
-  header: { fontSize: 26, fontWeight: "700", color: "#0F172A" },
-  greeting: { color: "#334155", fontSize: 14, marginBottom: 12 },
-  cardsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E2E8F0" },
-  cardFlex: { flex: 1 },
-  cardLabel: { color: "#64748B", fontSize: 12, marginBottom: 4 },
-  cardValue: { fontSize: 18, fontWeight: "700" },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 8, marginTop: 4 },
-  btnNova: { backgroundColor: "#2563EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  btnNovaText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
-  transactionItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8, gap: 10 },
-  badge: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  badgeText: { fontSize: 16, fontWeight: "700" },
-  transactionInfo: { flex: 1 },
-  transactionTitle: { fontWeight: "700", color: "#0F172A", fontSize: 14 },
-  transactionMeta: { color: "#64748B", marginTop: 2, fontSize: 12 },
-  transactionValue: { fontWeight: "700", fontSize: 13 },
-  actions: { flexDirection: "row", gap: 4 },
-  actionBtn: { padding: 4, borderRadius: 8 },
-  actionEdit: { fontSize: 16 },
-  actionDelete: { fontSize: 16 },
-  emptyContainer: { alignItems: "center", paddingVertical: 32, gap: 12 },
-  emptyText: { color: "#64748B", fontSize: 14 },
-  btnEmptyAdd: { backgroundColor: "#2563EB", borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
-  btnEmptyAddText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
-  error: { color: "#B91C1C", fontSize: 14, marginTop: 8 },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  header: {
+    paddingTop: 50,
+    paddingHorizontal: Spacing.xxl,
+    paddingBottom: Spacing.xl,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  headerGreeting: {
+    color: Colors.textGray,
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+  },
+  headerName: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.xxl,
+    paddingBottom: 120,
+  },
+  walletToggle: {
+    flexDirection: "row",
+    backgroundColor: "#E2E8F0",
+    borderRadius: BorderRadius.xl,
+    padding: 4,
+    marginBottom: Spacing.xxl,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+  },
+  toggleButtonActivePersonal: {
+    backgroundColor: Colors.surface,
+    ...Shadow.sm,
+  },
+  toggleButtonActiveJoint: {
+    backgroundColor: Colors.surface,
+    ...Shadow.sm,
+  },
+  toggleText: {
+    color: Colors.textGray,
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.sm,
+  },
+  toggleTextActivePersonal: {
+    color: Colors.primary,
+  },
+  toggleTextActiveJoint: {
+    color: Colors.jointPrimary,
+  },
+  balanceContainer: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  balanceLabel: {
+    color: Colors.textGray,
+    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  balanceValue: {
+    marginTop: 5,
+    fontSize: 42,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.textPrimary,
+  },
+  balanceCurrency: {
+    fontSize: 24,
+    color: Colors.textMuted,
+    fontWeight: FontWeight.medium,
+  },
+  chartRing: {
+    width: 200,
+    height: 200,
+    alignSelf: "center",
+    marginBottom: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    ...Shadow.md,
+  },
+  chartCenter: {
+    position: "absolute",
+    alignItems: "center",
+  },
+  chartCenterLabel: {
+    color: Colors.textGray,
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.xs,
+  },
+  chartCenterValue: {
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.textPrimary,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  sectionLink: {
+    fontSize: FontSize.sm,
+    color: Colors.primary,
+    fontWeight: FontWeight.medium,
+  },
+  categoryRow: {
+    gap: 14,
+    paddingBottom: 10,
+  },
+  categoryCard: {
+    minWidth: 140,
+    padding: 18,
+    borderRadius: BorderRadius.xl,
+    gap: Spacing.md,
+  },
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryName: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  categoryValue: {
+    fontSize: FontSize.xs,
+    color: Colors.textGray,
+  },
+  txItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: 14,
+    marginBottom: Spacing.md,
+    ...Shadow.sm,
+  },
+  txIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  txInfo: {
+    flex: 1,
+  },
+  txTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  txMeta: {
+    color: Colors.textGray,
+    fontSize: FontSize.sm,
+  },
+  txValue: {
+    fontWeight: FontWeight.bold,
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+    marginLeft: 10,
+  },
+  txValuePositive: {
+    color: Colors.success,
+  },
+  errorCard: {
+    backgroundColor: Colors.errorLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  errorText: {
+    color: Colors.error,
+    textAlign: "center",
+  },
+  emptyCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    ...Shadow.sm,
+  },
+  emptyText: {
+    color: Colors.textGray,
+  },
 });

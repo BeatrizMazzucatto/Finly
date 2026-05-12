@@ -3,61 +3,38 @@ import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  StatusBar,
 } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { BorderRadius, FontSize, FontWeight, Spacing } from "@/constants/theme";
+import { formatMoneyInput } from "@/utils/formatters";
 
 export const ONBOARDING_KEY = "finly_onboarding_done";
 export const RENDA_KEY = "finly_renda_mensal";
-
-// Categorias padrão criadas automaticamente (US01)
-export const CATEGORIAS_PADRAO = [
-  "Alimentação",
-  "Mercado",
-  "Moradia",
-  "Contas Residenciais",
-  "Transporte",
-  "Combustível",
-  "Saúde",
-  "Farmácia",
-  "Educação",
-  "Lazer e Diversão",
-  "Bares e Restaurantes",
-  "Assinaturas e TV",
-  "Vestuário",
-  "Beleza e Cuidados",
-  "Pets",
-  "Viagem",
-  "Salário",
-  "Investimentos",
-  "Renda Extra",
-  "Transferências",
-];
+export const LIMITE_KEY = "finly_limite_gastos";
 
 export default function OnboardingScreen() {
-  const [renda, setRenda] = useState("");
+  const [renda, setRenda] = useState("5.000,00");
   const [saving, setSaving] = useState(false);
 
-  async function handleSalvar() {
-    const valor = renda.replace(/[^0-9,\.]/g, "").replace(",", ".");
-    const parsed = parseFloat(valor);
-
-    if (isNaN(parsed) || parsed <= 0) {
-      Alert.alert("Valor inválido", "Por favor, insira uma renda mensal válida.");
+  async function handleStart() {
+    const rendaNum = parseFloat(renda.replace(/\./g, "").replace(",", ".")) || 0;
+    if (rendaNum <= 0) {
+      Alert.alert("Valor inválido", "Informe uma renda mensal válida.");
       return;
     }
 
     setSaving(true);
     try {
-      // Armazena renda e marca onboarding como concluído (US01)
-      await AsyncStorage.setItem(RENDA_KEY, String(parsed));
+      await AsyncStorage.setItem(RENDA_KEY, String(rendaNum));
+      await AsyncStorage.setItem(LIMITE_KEY, String(rendaNum * 0.7));
       await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-      // Categorias padrão já existem no banco (seed do schema.sql)
       router.replace("/(tabs)");
     } catch {
       Alert.alert("Erro", "Não foi possível salvar as informações.");
@@ -66,136 +43,157 @@ export default function OnboardingScreen() {
     }
   }
 
-  async function handlePular() {
-    // Opção de pular a configuração inicial (US01)
+  async function handleSkip() {
     await AsyncStorage.setItem(ONBOARDING_KEY, "true");
     router.replace("/(tabs)");
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.select({ ios: "padding", default: undefined })}
-    >
-      <View style={styles.card}>
-        <Text style={styles.logo}>Finly</Text>
-        <Text style={styles.title}>Bem-vindo ao Finly!</Text>
-        <Text style={styles.subtitle}>
-          Para começar, precisamos de uma informação básica.
-        </Text>
-
-        <Text style={styles.label}>QUAL SUA RENDA MENSAL ATUAL?</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="R$ 0,00"
-          keyboardType="numeric"
-          value={renda}
-          onChangeText={setRenda}
-          autoFocus
-        />
-
-        <Text style={styles.categoriesNote}>
-          ✓ Categorias padrão serão criadas automaticamente
-        </Text>
-
-        <Pressable
-          style={[styles.btnPrimary, saving && styles.btnDisabled]}
-          onPress={handleSalvar}
-          disabled={saving}
-        >
-          <Text style={styles.btnPrimaryText}>
-            {saving ? "Salvando..." : "Salvar e Continuar"}
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.content}>
+        <View style={styles.hero}>
+          <LinearGradient
+            colors={["#4F46E5", "#3B82F6"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.logoBox}
+          >
+            <FontAwesome5 name="wallet" size={40} color="#FFFFFF" solid />
+          </LinearGradient>
+          <Text style={styles.title}>Bem-vindo ao Finly</Text>
+          <Text style={styles.subtitle}>
+            O controle inteligente para a sua vida financeira e familiar.
           </Text>
-        </Pressable>
+        </View>
 
-        <Pressable style={styles.btnSkip} onPress={handlePular}>
-          <Text style={styles.btnSkipText}>Pular configuração</Text>
-        </Pressable>
+        <View style={styles.card}>
+          <Text style={styles.label}>QUAL SUA RENDA MENSAL ATUAL?</Text>
+          <TextInput
+            style={styles.currencyInput}
+            value={`R$ ${renda}`}
+            onChangeText={(text) => setRenda(formatMoneyInput(text.replace(/^R\$\s?/, "")))}
+            keyboardType="numeric"
+          />
+          <View style={styles.currencyLine} />
+          <Pressable style={styles.primaryButton} onPress={handleStart} disabled={saving}>
+            <LinearGradient
+              colors={["#4F46E5", "#3B82F6"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryGradient}
+            >
+              <Text style={styles.primaryButtonText}>{saving ? "Salvando..." : "Começar Agora"}</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable onPress={handleSkip}>
+            <Text style={styles.skipText}>Pular configuração inicial</Text>
+          </Pressable>
+        </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7FB",
+    backgroundColor: "#F8FAFC",
+  },
+  content: {
+    flex: 1,
     justifyContent: "center",
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 32,
+  },
+  hero: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  logoBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    transform: [{ rotate: "-10deg" }],
+    shadowColor: "rgba(79, 70, 229, 0.4)",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 25,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: FontWeight.bold,
+    color: "#1E293B",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: Spacing.md,
   },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 28,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  logo: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#2563EB",
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 28,
-    lineHeight: 20,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   label: {
-    fontSize: 11,
-    fontWeight: "700",
+    textAlign: "center",
     color: "#64748B",
+    fontSize: 12,
+    fontWeight: FontWeight.bold,
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: 20,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#0F172A",
-    backgroundColor: "#F8FAFC",
-    marginBottom: 16,
+  currencyInput: {
+    fontSize: 36,
+    fontWeight: FontWeight.extrabold,
+    color: "#1E293B",
+    textAlign: "center",
+    paddingBottom: 10,
   },
-  categoriesNote: {
-    fontSize: 13,
-    color: "#15803D",
-    marginBottom: 24,
+  currencyLine: {
+    height: 2,
+    backgroundColor: "#E2E8F0",
+    marginBottom: 30,
   },
-  btnPrimary: {
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    padding: 16,
+  primaryButton: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 10,
+    shadowColor: "rgba(79, 70, 229, 0.3)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  primaryGradient: {
+    paddingVertical: 18,
     alignItems: "center",
-    marginBottom: 12,
   },
-  btnDisabled: {
-    opacity: 0.7,
-  },
-  btnPrimaryText: {
+  primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: FontWeight.semibold,
   },
-  btnSkip: {
-    alignItems: "center",
-    padding: 8,
-  },
-  btnSkipText: {
+  skipText: {
+    textAlign: "center",
     color: "#64748B",
-    fontSize: 14,
-    textDecorationLine: "underline",
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    paddingVertical: 12,
   },
 });
