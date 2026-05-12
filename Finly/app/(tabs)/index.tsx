@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,23 +9,78 @@ import {
   Text,
   View,
   StatusBar,
-  Dimensions,
 } from "react-native";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import Svg, { Circle } from "react-native-svg";
 
 import { useAuth } from "@/src/context/AuthContext";
-import { apiRequest } from "@/src/services/api";
 import { getTransactionsByUser } from "@/src/services/transactions";
 import type { Transaction } from "@/src/types/api";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
-import { Card, ProgressBar, TransactionItem } from "@/components/ui";
-import { formatCurrency, getGreeting, getCurrentMonthYear } from "@/utils/formatters";
+import { formatCurrency } from "@/utils/formatters";
+import { getCategoryColor, getCategoryIcon } from "@/constants/categories";
 
-const { width } = Dimensions.get("window");
-const LIMITE_KEY = "finly_limite_gastos";
+type WalletMode = "personal" | "joint";
+
+const CATEGORY_PALETTE = [
+  { bg: Colors.categories.alimentacao, icon: Colors.categoryIcons.alimentacao },
+  { bg: Colors.categories.transporte, icon: Colors.categoryIcons.transporte },
+  { bg: Colors.categories.saude, icon: Colors.categoryIcons.saude },
+  { bg: Colors.categories.lazer, icon: Colors.categoryIcons.lazer },
+];
+
+function formatTime(dateStr: string) {
+  const date = new Date(`${dateStr}T12:00:00`);
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function DonutChart({ total }: { total: number }) {
+  const size = 200;
+  const stroke = 25;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const segments = [0.4, 0.3, 0.2, 0.1];
+  const colors = [
+    Colors.categories.alimentacao,
+    Colors.categories.transporte,
+    Colors.categories.saude,
+    Colors.categories.lazer,
+  ];
+
+  let offset = 0;
+
+  return (
+    <View style={styles.chartRing}>
+      <Svg width={size} height={size}>
+        {segments.map((value, index) => {
+          const dash = circumference * value;
+          const circle = (
+            <Circle
+              key={index}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={colors[index]}
+              strokeWidth={stroke}
+              fill="transparent"
+              strokeDasharray={`${dash} ${circumference - dash}`}
+              strokeDashoffset={-offset}
+              rotation={-90}
+              origin={`${size / 2}, ${size / 2}`}
+            />
+          );
+          offset += dash;
+          return circle;
+        })}
+      </Svg>
+      <View style={styles.chartCenter}>
+        <Text style={styles.chartCenterLabel}>Despesas</Text>
+        <Text style={styles.chartCenterValue}>{formatCurrency(total)}</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -33,19 +88,44 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [limite, setLimite] = useState(2000);
+  const [walletMode, setWalletMode] = useState<WalletMode>("personal");
 
-  const totalReceitas = useMemo(
-    () => transactions.filter((t) => t.tipo === "RECEITA").reduce((a, t) => a + Number(t.valor), 0),
+  const despesas = useMemo(
+    () => transactions.filter((t) => t.tipo === "DESPESA"),
+    [transactions]
+  );
+  const receitas = useMemo(
+    () => transactions.filter((t) => t.tipo === "RECEITA"),
     [transactions]
   );
   const totalDespesas = useMemo(
-    () => transactions.filter((t) => t.tipo === "DESPESA").reduce((a, t) => a + Number(t.valor), 0),
-    [transactions]
+    () => despesas.reduce((sum, item) => sum + Number(item.valor), 0),
+    [despesas]
+  );
+  const totalReceitas = useMemo(
+    () => receitas.reduce((sum, item) => sum + Number(item.valor), 0),
+    [receitas]
   );
   const saldo = totalReceitas - totalDespesas;
-  const limiteProgress = (totalDespesas / limite) * 100;
-  const recentTransactions = transactions.slice(0, 4);
+
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    despesas.forEach((item) => {
+      const key = item.categoria ?? "Outros";
+      totals.set(key, (totals.get(key) ?? 0) + Number(item.valor));
+    });
+    return Array.from(totals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+  }, [despesas]);
+
+  const recentTransactions = useMemo(
+    () =>
+      [...transactions].sort(
+        (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
+      ).slice(0, 4),
+    [transactions]
+  );
 
   async function loadData(isPullToRefresh = false) {
     if (!user) return;
@@ -53,18 +133,8 @@ export default function HomeScreen() {
       setError(null);
       if (isPullToRefresh) setRefreshing(true);
       else setLoading(true);
-
-      const [data, limiteStored] = await Promise.all([
-        getTransactionsByUser(user.id_usuario),
-        AsyncStorage.getItem(LIMITE_KEY),
-      ]);
-
-      if (limiteStored) setLimite(Number(limiteStored));
-
-      const sorted = [...data].sort(
-        (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
-      );
-      setTransactions(sorted);
+      const data = await getTransactionsByUser(user.id_usuario);
+      setTransactions(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
@@ -77,221 +147,129 @@ export default function HomeScreen() {
     loadData();
   }, [user?.id_usuario]);
 
-  function handleEdit(item: Transaction) {
-    router.push({
-      pathname: "/transaction-form",
-      params: {
-        id_transacao: String(item.id_transacao),
-        titulo: item.titulo,
-        valor: String(item.valor),
-        tipo: item.tipo,
-        categoria_nome: item.categoria ?? "",
-        data_transacao: item.data_transacao,
-      },
-    });
-  }
-
-  function handleDelete(item: Transaction) {
-    Alert.alert(
-      "Excluir transação",
-      `Deseja excluir "${item.titulo}"?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
-              await loadData();
-            } catch (err) {
-              Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
-            }
-          },
-        },
-      ]
-    );
-  }
+  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.nome ?? "User")}&background=4F46E5&color=fff`;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />}
-      showsVerticalScrollIndicator={false}
-    >
-      <StatusBar barStyle="light-content" />
-
-      {/* Header com Saldo */}
-      <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.header}>
-        <View style={styles.headerTop}>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           <View>
-            <Text style={styles.greeting}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.nome ?? "Usuário"}</Text>
-          </View>
-          <Pressable style={styles.notificationBtn}>
-            <Feather name="bell" size={22} color={Colors.textInverse} />
-            <View style={styles.notificationBadge} />
-          </Pressable>
-        </View>
-
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Saldo atual</Text>
-          <Text style={[styles.balanceValue, { color: saldo >= 0 ? Colors.income : Colors.error }]}>
-            {formatCurrency(saldo)}
-          </Text>
-          <Text style={styles.monthLabel}>{getCurrentMonthYear()}</Text>
-        </View>
-
-        {/* Quick Stats */}
-        <View style={styles.quickStats}>
-          <View style={styles.quickStatItem}>
-            <View style={[styles.quickStatIcon, { backgroundColor: Colors.incomeLight }]}>
-              <Feather name="arrow-up" size={16} color={Colors.income} />
-            </View>
-            <View>
-              <Text style={styles.quickStatLabel}>Receitas</Text>
-              <Text style={[styles.quickStatValue, { color: Colors.income }]}>
-                {formatCurrency(totalReceitas)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.quickStatDivider} />
-          <View style={styles.quickStatItem}>
-            <View style={[styles.quickStatIcon, { backgroundColor: Colors.expenseLight }]}>
-              <Feather name="arrow-down" size={16} color={Colors.expense} />
-            </View>
-            <View>
-              <Text style={styles.quickStatLabel}>Despesas</Text>
-              <Text style={[styles.quickStatValue, { color: Colors.expense }]}>
-                {formatCurrency(totalDespesas)}
-              </Text>
-            </View>
+            <Text style={styles.headerGreeting}>Olá, de novo!</Text>
+            <Text style={styles.headerName}>{user?.nome ?? "Usuário"}</Text>
           </View>
         </View>
-      </LinearGradient>
-
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <Pressable style={styles.quickActionItem} onPress={() => router.push("/transaction-form")}>
-          <View style={[styles.quickActionIcon, { backgroundColor: Colors.primary + "15" }]}>
-            <Feather name="plus" size={24} color={Colors.primary} />
-          </View>
-          <Text style={styles.quickActionText}>Adicionar</Text>
-        </Pressable>
-        <Pressable style={styles.quickActionItem} onPress={() => router.push("/(tabs)/statistics")}>
-          <View style={[styles.quickActionIcon, { backgroundColor: Colors.secondary + "15" }]}>
-            <Feather name="pie-chart" size={24} color={Colors.secondary} />
-          </View>
-          <Text style={styles.quickActionText}>Estatísticas</Text>
-        </Pressable>
-        <Pressable style={styles.quickActionItem} onPress={() => router.push("/(tabs)/history")}>
-          <View style={[styles.quickActionIcon, { backgroundColor: Colors.warning + "15" }]}>
-            <Feather name="clock" size={24} color={Colors.warning} />
-          </View>
-          <Text style={styles.quickActionText}>Histórico</Text>
-        </Pressable>
-        <Pressable style={styles.quickActionItem} onPress={() => router.push("/(tabs)/settings")}>
-          <View style={[styles.quickActionIcon, { backgroundColor: Colors.textMuted + "15" }]}>
-            <Feather name="settings" size={24} color={Colors.textMuted} />
-          </View>
-          <Text style={styles.quickActionText}>Config</Text>
+        <Pressable style={styles.bellButton}>
+          <Feather name="bell" size={18} color={Colors.textPrimary} />
         </Pressable>
       </View>
 
-      {/* Limite de Gastos */}
-      <Card style={styles.limiteCard}>
-        <View style={styles.limiteHeader}>
-          <View style={styles.limiteTitleRow}>
-            <Feather name="shield" size={20} color={Colors.primary} />
-            <Text style={styles.limiteTitle}>Limite de Gastos</Text>
-          </View>
-          <Text style={[
-            styles.limitePercent,
-            { color: limiteProgress > 80 ? Colors.error : limiteProgress > 60 ? Colors.warning : Colors.primary },
-          ]}>
-            {Math.round(limiteProgress)}%
-          </Text>
-        </View>
-        <ProgressBar
-          progress={limiteProgress}
-          color={limiteProgress > 80 ? Colors.error : limiteProgress > 60 ? Colors.warning : Colors.primary}
-          height={10}
-          showOverflow
-        />
-        <View style={styles.limiteFooter}>
-          <Text style={styles.limiteUsed}>{formatCurrency(totalDespesas)}</Text>
-          <Text style={styles.limiteTotal}>de {formatCurrency(limite)}</Text>
-        </View>
-        {limiteProgress > 80 && (
-          <View style={styles.limiteAlert}>
-            <Feather name="alert-triangle" size={16} color={Colors.error} />
-            <Text style={styles.limiteAlertText}>
-              Você está próximo do limite mensal!
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.walletToggle}>
+          <Pressable
+            style={[styles.toggleButton, walletMode === "personal" && styles.toggleButtonActivePersonal]}
+            onPress={() => setWalletMode("personal")}
+          >
+            <Text style={[styles.toggleText, walletMode === "personal" && styles.toggleTextActivePersonal]}>
+              Minha Carteira
             </Text>
-          </View>
-        )}
-      </Card>
-
-      {/* Transações Recentes */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Atividade Recente</Text>
-          <Pressable onPress={() => router.push("/(tabs)/history")}>
-            <Text style={styles.seeAllText}>Ver tudo</Text>
           </Pressable>
+          <Pressable
+            style={[styles.toggleButton, walletMode === "joint" && styles.toggleButtonActiveJoint]}
+            onPress={() => setWalletMode("joint")}
+          >
+            <Text style={[styles.toggleText, walletMode === "joint" && styles.toggleTextActiveJoint]}>
+              Carteira Conjunta
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.balanceContainer}>
+          <Text style={styles.balanceLabel}>Saldo Disponível</Text>
+          <Text style={styles.balanceValue}>{formatCurrency(saldo)}</Text>
+        </View>
+
+        <DonutChart total={totalDespesas} />
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Gastos por Categoria</Text>
+          <Pressable onPress={() => router.push("/(tabs)/history")}>
+            <Text style={styles.sectionLink}>Ver tudo</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+          {categoryTotals.length === 0 ? (
+            <View style={[styles.categoryCard, { backgroundColor: Colors.categories.outros }]}>
+              <View style={[styles.categoryIcon, { backgroundColor: Colors.surface }]}>
+                <Feather name="tag" size={18} color={Colors.categoryIcons.outros} />
+              </View>
+              <Text style={styles.categoryName}>Sem gastos</Text>
+              <Text style={styles.categoryValue}>R$ 0,00</Text>
+            </View>
+          ) : (
+            categoryTotals.map(([nome, total], index) => {
+              const palette = CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
+              const icon = getCategoryIcon(nome);
+              return (
+                <View key={nome} style={[styles.categoryCard, { backgroundColor: palette.bg }]}>
+                  <View style={[styles.categoryIcon, { backgroundColor: Colors.surface }]}>
+                    <Feather name={icon} size={18} color={palette.icon} />
+                  </View>
+                  <Text style={styles.categoryName}>{nome}</Text>
+                  <Text style={styles.categoryValue}>{formatCurrency(total)}</Text>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        <View style={[styles.sectionHeader, { marginTop: Spacing.xxl }]}>
+          <Text style={styles.sectionTitle}>Transações Recentes</Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" style={{ marginVertical: Spacing.xxl }} />
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: Spacing.xxl }} />
         ) : error ? (
-          <Card variant="error" style={styles.errorCard}>
-            <Feather name="alert-circle" size={24} color={Colors.error} />
+          <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
-          </Card>
-        ) : recentTransactions.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <Feather name="inbox" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>Nenhuma transação</Text>
-            <Text style={styles.emptySubtitle}>
-              Comece adicionando sua primeira transação
-            </Text>
-            <Pressable style={styles.emptyButton} onPress={() => router.push("/transaction-form")}>
-              <Feather name="plus" size={18} color={Colors.textInverse} />
-              <Text style={styles.emptyButtonText}>Adicionar transação</Text>
-            </Pressable>
-          </Card>
-        ) : (
-          <View style={styles.transactionsList}>
-            {recentTransactions.map((item) => (
-              <TransactionItem
-                key={item.id_transacao}
-                id={item.id_transacao}
-                titulo={item.titulo}
-                valor={Number(item.valor)}
-                tipo={item.tipo}
-                categoria={item.categoria ?? "Outros"}
-                data={item.data_transacao}
-                onPress={() => handleEdit(item)}
-              />
-            ))}
           </View>
+        ) : recentTransactions.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Nenhuma transação recente.</Text>
+          </View>
+        ) : (
+          recentTransactions.map((item) => {
+            const isExpense = item.tipo === "DESPESA";
+            const icon = getCategoryIcon(item.categoria ?? "Outros");
+            const bg = getCategoryColor(item.categoria ?? "Outros");
+            return (
+              <View key={item.id_transacao} style={styles.txItem}>
+                <View style={[styles.txIcon, { backgroundColor: bg }]}>
+                  <Feather name={icon} size={20} color={Colors.textPrimary} />
+                </View>
+                <View style={styles.txInfo}>
+                  <Text style={styles.txTitle}>{item.titulo}</Text>
+                  <Text style={styles.txMeta}>
+                    {item.categoria ?? "Sem categoria"} • {formatTime(item.data_transacao)}
+                  </Text>
+                </View>
+                <Text style={[styles.txValue, !isExpense && styles.txValuePositive]}>
+                  {isExpense ? "- " : "+ "}
+                  {formatCurrency(Number(item.valor))}
+                </Text>
+              </View>
+            );
+          })
         )}
-      </View>
-
-      {/* Dica do dia */}
-      <Card style={styles.tipCard}>
-        <View style={styles.tipIcon}>
-          <Feather name="zap" size={20} color={Colors.warning} />
-        </View>
-        <View style={styles.tipContent}>
-          <Text style={styles.tipTitle}>Dica do dia</Text>
-          <Text style={styles.tipText}>
-            Defina metas de economia para alcançar seus objetivos financeiros mais rapidamente.
-          </Text>
-        </View>
-      </Card>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -300,268 +278,225 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  content: {
-    paddingBottom: 100,
-  },
   header: {
     paddingTop: 50,
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xxxl,
-    borderBottomLeftRadius: BorderRadius.xl,
-    borderBottomRightRadius: BorderRadius.xl,
-  },
-  headerTop: {
+    paddingHorizontal: Spacing.xxl,
+    paddingBottom: Spacing.xl,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.xl,
   },
-  greeting: {
-    fontSize: FontSize.sm,
-    color: Colors.textInverse,
-    opacity: 0.8,
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
   },
-  userName: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Colors.textInverse,
-  },
-  notificationBtn: {
+  avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  notificationBadge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.error,
-  },
-  balanceCard: {
-    alignItems: "center",
-    marginBottom: Spacing.xl,
-  },
-  balanceLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textInverse,
-    opacity: 0.8,
-    marginBottom: Spacing.xs,
-  },
-  balanceValue: {
-    fontSize: 40,
-    fontWeight: FontWeight.bold,
-  },
-  monthLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textInverse,
-    opacity: 0.7,
-    marginTop: Spacing.xs,
-  },
-  quickStats: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-  },
-  quickStatItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  quickStatIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickStatLabel: {
+  headerGreeting: {
+    color: Colors.textGray,
     fontSize: FontSize.xs,
-    color: Colors.textInverse,
-    opacity: 0.8,
-  },
-  quickStatValue: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-  },
-  quickStatDivider: {
-    width: 1,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    marginHorizontal: Spacing.lg,
-  },
-  quickActions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    marginTop: -Spacing.xl,
-    marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    ...Shadow.md,
-  },
-  quickActionItem: {
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  quickActionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionText: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.medium,
-  },
-  limiteCard: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-  },
-  limiteHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  limiteTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  limiteTitle: {
-    fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
-    color: Colors.textPrimary,
   },
-  limitePercent: {
+  headerName: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-  },
-  limiteFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: Spacing.sm,
-  },
-  limiteUsed: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
     color: Colors.textPrimary,
   },
-  limiteTotal: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-  },
-  limiteAlert: {
-    flexDirection: "row",
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: "center",
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    justifyContent: "center",
   },
-  limiteAlertText: {
-    fontSize: FontSize.sm,
-    color: Colors.error,
+  scroll: {
     flex: 1,
   },
-  section: {
-    marginTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
+  scrollContent: {
+    paddingHorizontal: Spacing.xxl,
+    paddingBottom: 120,
+  },
+  walletToggle: {
+    flexDirection: "row",
+    backgroundColor: "#E2E8F0",
+    borderRadius: BorderRadius.xl,
+    padding: 4,
+    marginBottom: Spacing.xxl,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+  },
+  toggleButtonActivePersonal: {
+    backgroundColor: Colors.surface,
+    ...Shadow.sm,
+  },
+  toggleButtonActiveJoint: {
+    backgroundColor: Colors.surface,
+    ...Shadow.sm,
+  },
+  toggleText: {
+    color: Colors.textGray,
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.sm,
+  },
+  toggleTextActivePersonal: {
+    color: Colors.primary,
+  },
+  toggleTextActiveJoint: {
+    color: Colors.jointPrimary,
+  },
+  balanceContainer: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  balanceLabel: {
+    color: Colors.textGray,
+    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  balanceValue: {
+    marginTop: 5,
+    fontSize: 42,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.textPrimary,
+  },
+  balanceCurrency: {
+    fontSize: 24,
+    color: Colors.textMuted,
+    fontWeight: FontWeight.medium,
+  },
+  chartRing: {
+    width: 200,
+    height: 200,
+    alignSelf: "center",
+    marginBottom: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    ...Shadow.md,
+  },
+  chartCenter: {
+    position: "absolute",
+    alignItems: "center",
+  },
+  chartCenterLabel: {
+    color: Colors.textGray,
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.xs,
+  },
+  chartCenterValue: {
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.extrabold,
+    color: Colors.textPrimary,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
-  seeAllText: {
+  sectionLink: {
     fontSize: FontSize.sm,
     color: Colors.primary,
     fontWeight: FontWeight.medium,
   },
-  transactionsList: {
-    gap: Spacing.sm,
+  categoryRow: {
+    gap: 14,
+    paddingBottom: 10,
   },
-  errorCard: {
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  errorText: {
-    color: Colors.error,
-    fontSize: FontSize.sm,
-  },
-  emptyCard: {
-    alignItems: "center",
-    paddingVertical: Spacing.xxl,
-    gap: Spacing.sm,
-  },
-  emptyTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textPrimary,
-  },
-  emptySubtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    textAlign: "center",
-  },
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.md,
-  },
-  emptyButtonText: {
-    color: Colors.textInverse,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-  },
-  tipCard: {
-    flexDirection: "row",
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
+  categoryCard: {
+    minWidth: 140,
+    padding: 18,
+    borderRadius: BorderRadius.xl,
     gap: Spacing.md,
   },
-  tipIcon: {
+  categoryIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.warningLight,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  tipContent: {
+  categoryName: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  categoryValue: {
+    fontSize: FontSize.xs,
+    color: Colors.textGray,
+  },
+  txItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: 14,
+    marginBottom: Spacing.md,
+    ...Shadow.sm,
+  },
+  txIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  txInfo: {
     flex: 1,
   },
-  tipTitle: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
+  txTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
     marginBottom: 2,
   },
-  tipText: {
+  txMeta: {
+    color: Colors.textGray,
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
+  },
+  txValue: {
+    fontWeight: FontWeight.bold,
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+    marginLeft: 10,
+  },
+  txValuePositive: {
+    color: Colors.success,
+  },
+  errorCard: {
+    backgroundColor: Colors.errorLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  errorText: {
+    color: Colors.error,
+    textAlign: "center",
+  },
+  emptyCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    ...Shadow.sm,
+  },
+  emptyText: {
+    color: Colors.textGray,
   },
 });

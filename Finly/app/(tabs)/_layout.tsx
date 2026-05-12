@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { View, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { Colors, Shadow } from "@/constants/theme";
 
 export default function TabsLayout() {
@@ -19,19 +20,15 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "Início",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={22} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="pie-chart" size={20} color={color} />,
         }}
       />
 
       <Tabs.Screen
-        name="statistics"
+        name="history"
         options={{
-          title: "Estatísticas",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="pie-chart" size={22} color={color} />
-          ),
+          title: "Histórico",
+          tabBarIcon: ({ color }) => <Feather name="list" size={20} color={color} />,
         }}
       />
 
@@ -39,9 +36,11 @@ export default function TabsLayout() {
         name="add"
         options={{
           title: "",
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: () => (
             <View style={styles.addButton}>
-              <Feather name="plus" size={28} color={Colors.textInverse} />
+              <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.addGradient}>
+                <Feather name="plus" size={24} color={Colors.textInverse} />
+              </LinearGradient>
             </View>
           ),
           tabBarButton: (props: any) => (
@@ -54,11 +53,9 @@ export default function TabsLayout() {
               style={styles.addButtonContainer}
             >
               <View style={styles.addButton}>
-                <Feather
-                  name="plus"
-                  size={28}
-                  color={Colors.textInverse}
-                />
+                <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.addGradient}>
+                  <Feather name="plus" size={24} color={Colors.textInverse} />
+                </LinearGradient>
               </View>
             </Pressable>
           ),
@@ -73,24 +70,22 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="history"
+        name="groups"
         options={{
-          title: "Histórico",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="clock" size={22} color={color} />
-          ),
+          title: "Grupos",
+          tabBarIcon: ({ color }) => <Feather name="users" size={20} color={color} />,
         }}
       />
 
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Config",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="settings" size={22} color={color} />
-          ),
+          title: "Ajustes",
+          tabBarIcon: ({ color }) => <Feather name="settings" size={20} color={color} />,
         }}
       />
+
+      <Tabs.Screen name="statistics" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -98,17 +93,16 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    backgroundColor: Colors.surface,
+    backgroundColor: "rgba(255,255,255,0.92)",
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    height: 80,
-    paddingBottom: 20,
+    borderTopColor: "rgba(255,255,255,0.3)",
+    height: 85,
+    paddingBottom: 15,
     paddingTop: 10,
-    ...Shadow.md,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: "500",
+    fontSize: 10,
+    fontWeight: "600",
   },
   addButtonContainer: {
     top: -20,
@@ -118,10 +112,13 @@ const styles = StyleSheet.create({
   addButton: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
+    borderRadius: 20,
+    overflow: "hidden",
+    ...Shadow.lg,
+  },
+  addGradient: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    ...Shadow.lg,
   },
 });
