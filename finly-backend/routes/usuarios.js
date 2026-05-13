@@ -13,9 +13,10 @@ router.post("/login", (req, res) => {
   }
 
   const sql = `
-    SELECT id_usuario, nome, email, senha_hash
-    FROM usuarios
-    WHERE email = $1
+    SELECT u.id_usuario, u.nome, u.email, u.senha_hash, uc.id_carteira
+    FROM usuarios u
+    LEFT JOIN usuarios_carteiras uc ON u.id_usuario = uc.id_usuario AND uc.papel = 'PROPRIETARIO'
+    WHERE u.email = $1
     LIMIT 1
   `;
 
@@ -40,6 +41,7 @@ router.post("/login", (req, res) => {
       id_usuario: usuario.id_usuario,
       nome: usuario.nome,
       email: usuario.email,
+      id_carteira_pessoal: usuario.id_carteira || null,
     });
   });
 });
@@ -71,6 +73,52 @@ router.post("/", (req, res) => {
       id_usuario: result.rows[0].id_usuario,
     });
   });
+});
+
+// POST /usuarios/:id/onboarding
+router.post("/:id/onboarding", async (req, res) => {
+  const { id } = req.params;
+  const { renda_mensal } = req.body;
+
+  if (!renda_mensal || isNaN(Number(renda_mensal))) {
+    return res.status(400).json({ erro: "Renda mensal inválida" });
+  }
+
+  try {
+    // Buscar nome do usuario
+    const userRes = await db.query("SELECT nome FROM usuarios WHERE id_usuario = $1", [id]);
+    if (userRes.rowCount === 0) {
+      return res.status(404).json({ erro: "Usuário não encontrado" });
+    }
+    const userName = userRes.rows[0].nome;
+
+    // Criar carteira pessoal
+    const carteiraRes = await db.query(
+      "INSERT INTO carteiras (nome, tipo, limite_gastos_mensal) VALUES ($1, $2, $3) RETURNING id_carteira",
+      [`Pessoal - ${userName}`, "PESSOAL", 0]
+    );
+    const id_carteira = carteiraRes.rows[0].id_carteira;
+
+    // Vincular usuario a carteira
+    await db.query(
+      "INSERT INTO usuarios_carteiras (id_usuario, id_carteira, papel, renda_mensal_alocada) VALUES ($1, $2, $3, $4)",
+      [id, id_carteira, "PROPRIETARIO", Number(renda_mensal)]
+    );
+
+    // Criar transacao inicial de salario (categoria 17 é Salário)
+    const today = new Date().toISOString().split('T')[0];
+    await db.query(
+      `INSERT INTO transacoes 
+      (id_carteira, id_usuario, id_categoria, titulo, tipo, valor, data_transacao, status) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id_carteira, id, 17, "Salário Inicial", "RECEITA", Number(renda_mensal), today, "PAGO"]
+    );
+
+    res.json({ mensagem: "Onboarding concluído com sucesso", id_carteira });
+  } catch (err) {
+    console.error("Erro no onboarding:", err);
+    res.status(500).json({ erro: "Erro ao salvar dados de onboarding" });
+  }
 });
 
 module.exports = router;
