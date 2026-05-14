@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, TextInput, Alert } from 'react-native';
 import { Feather } from "@expo/vector-icons";
 
@@ -20,6 +20,25 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
   const [txValor, setTxValor] = useState("");
   const [txTitulo, setTxTitulo] = useState("");
   const [txCategoria, setTxCategoria] = useState("Alimentação");
+
+  // Reseta os campos toda vez que o modal é fechado
+  useEffect(() => {
+    if (!visible) {
+      setTxValor("");
+      setTxTitulo("");
+      setTxTipo("DESPESA");
+      setTxCategoria("Alimentação");
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    // Reseta imediatamente antes de fechar
+    setTxValor("");
+    setTxTitulo("");
+    setTxTipo("DESPESA");
+    setTxCategoria("Alimentação");
+    onClose();
+  };
 
   const handleSave = async () => {
     if (!txValor || !txTitulo) {
@@ -46,14 +65,14 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <Pressable style={styles.modalOverlay} onPress={handleClose}>
         <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
           <View style={styles.modalHandle} />
           
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Nova Transação</Text>
-            <Pressable onPress={onClose} hitSlop={15}>
+            <Pressable onPress={handleClose} hitSlop={15}>
               <Feather name="x" size={24} color="#64748B" />
             </Pressable>
           </View>
@@ -77,7 +96,7 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
           <TextInput style={styles.input} placeholder="Categoria" value={txCategoria} onChangeText={setTxCategoria} />
 
           <View style={styles.actionRow}>
-            <Pressable style={[styles.btnMain, styles.btnCancel]} onPress={onClose}>
+            <Pressable style={[styles.btnMain, styles.btnCancel]} onPress={handleClose}>
               <Text style={[styles.btnMainText, {color: '#0F172A'}]}>Cancelar</Text>
             </Pressable>
             <Pressable style={styles.btnMain} onPress={handleSave}>
