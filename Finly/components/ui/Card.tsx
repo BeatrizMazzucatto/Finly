@@ -40,8 +40,8 @@ export function Card({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    ...Shadow.md,
+    borderRadius: BorderRadius.xxl,
+    ...Shadow.sm,
   },
   header: {
     marginBottom: Spacing.md,
@@ -59,11 +59,10 @@ const styles = StyleSheet.create({
 
   // Variants
   variant_default: {
-    borderWidth: 1,
-    borderColor: Colors.border,
+    // No border as per style.css
   },
   variant_elevated: {
-    ...Shadow.lg,
+    ...Shadow.md,
   },
   variant_outlined: {
     backgroundColor: "transparent",
@@ -96,9 +95,9 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   padding_md: {
-    padding: Spacing.lg,
+    padding: Spacing.xl,
   },
   padding_lg: {
-    padding: Spacing.xl,
+    padding: Spacing.xxl,
   },
 });

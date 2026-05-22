@@ -6,6 +6,9 @@ export interface User {
 
 export interface Transaction {
   id_transacao: number;
+  id_carteira?: number;
+  id_usuario?: number;
+  usuario_nome?: string;
   titulo: string;
   tipo: "RECEITA" | "DESPESA";
   valor: number;

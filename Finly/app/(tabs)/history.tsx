@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   StatusBar,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -21,7 +22,7 @@ import { Card, Chip, TransactionItem } from "@/components/ui";
 import { formatCurrency, getCurrentMonthYear } from "@/utils/formatters";
 import { CATEGORIAS } from "@/constants/categories";
 
-const FILTER_OPTIONS = ["Todos", "Alimentação", "Transporte", "Saúde", "Lazer", "Moradia"];
+const FILTER_OPTIONS = ["Todos", "Receitas", "Despesas", "Conjuntas"];
 
 export default function HistoryScreen() {
   const { user } = useAuth();
@@ -32,6 +33,38 @@ export default function HistoryScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [sortOrder, setSortOrder] = useState<"recent" | "oldest" | "highest" | "lowest">("recent");
+  const [showSearch, setShowSearch] = useState(false);
+
+  const monthFilters = useMemo(() => {
+    const months = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+    const current = new Date();
+    const list = [];
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(current.getFullYear(), current.getMonth() - i, 1);
+      list.push({
+        label: months[d.getMonth()],
+        month: d.getMonth(),
+        year: d.getFullYear(),
+      });
+    }
+    return list;
+  }, []);
+
+  const [activeMonthFilter, setActiveMonthFilter] = useState<{
+    label: string;
+    month: number;
+    year: number;
+  } | null>(null);
+
+  // Selecionar o mês atual por padrão
+  useEffect(() => {
+    if (monthFilters.length > 0 && !activeMonthFilter) {
+      setActiveMonthFilter(monthFilters[0]);
+    }
+  }, [monthFilters]);
 
   async function loadData(isPullToRefresh = false) {
     if (!user) return;
@@ -61,9 +94,26 @@ export default function HistoryScreen() {
   useEffect(() => {
     let filtered = [...transactions];
 
-    // Filtro por categoria
-    if (activeFilter !== "Todos") {
-      filtered = filtered.filter((t) => t.categoria === activeFilter);
+    // Filtro por tipo/conjunta
+    if (activeFilter === "Conjuntas") {
+      filtered = filtered.filter((t) => t.id_carteira === 3);
+    } else if (activeFilter === "Receitas") {
+      filtered = filtered.filter((t) => t.tipo === "RECEITA");
+    } else if (activeFilter === "Despesas") {
+      filtered = filtered.filter((t) => t.tipo === "DESPESA");
+    }
+
+    // Filtro por mês/ano
+    if (activeMonthFilter) {
+      filtered = filtered.filter((t) => {
+        const parts = t.data_transacao.split("-");
+        if (parts.length >= 2) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1; // 0-indexed
+          return year === activeMonthFilter.year && month === activeMonthFilter.month;
+        }
+        return false;
+      });
     }
 
     // Filtro por busca
@@ -92,7 +142,7 @@ export default function HistoryScreen() {
     }
 
     setFilteredTransactions(filtered);
-  }, [transactions, activeFilter, searchQuery, sortOrder]);
+  }, [transactions, activeFilter, activeMonthFilter, searchQuery, sortOrder]);
 
   const totalFiltered = useMemo(
     () => filteredTransactions.reduce((a, t) => a + (t.tipo === "DESPESA" ? -Number(t.valor) : Number(t.valor)), 0),
@@ -130,30 +180,39 @@ export default function HistoryScreen() {
         tipo: item.tipo,
         categoria_nome: item.categoria ?? "",
         data_transacao: item.data_transacao,
+        id_carteira: String(item.id_carteira ?? 1),
       },
     });
   }
 
   function handleDelete(item: Transaction) {
-    Alert.alert(
-      "Excluir transação",
-      `Deseja excluir "${item.titulo}"?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
-              await loadData();
-            } catch (err) {
-              Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
-            }
-          },
-        },
-      ]
-    );
+    const doDelete = async () => {
+      try {
+        await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
+        await loadData();
+      } catch (err) {
+        if (Platform.OS === "web") {
+          alert("Erro: " + (err instanceof Error ? err.message : "Não foi possível excluir."));
+        } else {
+          Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
+        }
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm(`Excluir transação\n\nDeseja excluir "${item.titulo}"?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert(
+        "Excluir transação",
+        `Deseja excluir "${item.titulo}"?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Excluir", style: "destructive", onPress: doDelete },
+        ]
+      );
+    }
   }
 
   function formatDateHeader(dateStr: string): string {
@@ -182,40 +241,67 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Histórico</Text>
-        <Text style={styles.subtitle}>{getCurrentMonthYear()}</Text>
+        <Pressable onPress={() => setShowSearch(!showSearch)} style={styles.searchToggleBtn}>
+          <Feather name="search" size={22} color={Colors.textPrimary} />
+        </Pressable>
       </View>
 
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Feather name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar transações..."
-          placeholderTextColor={Colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery("")}>
-            <Feather name="x" size={20} color={Colors.textMuted} />
-          </Pressable>
-        )}
-      </View>
+      {/* Search Input (hidden by default) */}
+      {showSearch && (
+        <View style={styles.searchContainer}>
+          <Feather name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar transações..."
+            placeholderTextColor={Colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <Feather name="x" size={20} color={Colors.textMuted} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
-      {/* Filters */}
+      {/* Filters (Type Row) */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.filtersScroll}
         contentContainerStyle={styles.filtersContent}
       >
-        {FILTER_OPTIONS.map((filter) => (
+        {FILTER_OPTIONS.map((filter) => {
+          const isConjuntas = filter === "Conjuntas";
+          return (
+            <Chip
+              key={filter}
+              label={filter}
+              selected={activeFilter === filter}
+              onPress={() => setActiveFilter(filter)}
+              color={isConjuntas ? Colors.jointPrimary : Colors.primary}
+              icon={isConjuntas ? "users" : undefined}
+            />
+          );
+        })}
+      </ScrollView>
+
+      {/* Filters (Month Row) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.filtersScroll, { marginBottom: 20 }]}
+        contentContainerStyle={styles.filtersContent}
+      >
+        {monthFilters.map((item) => (
           <Chip
-            key={filter}
-            label={filter}
-            selected={activeFilter === filter}
-            onPress={() => setActiveFilter(filter)}
-            color={Colors.primary}
+            key={`${item.year}-${item.month}`}
+            label={item.label}
+            size="sm"
+            selected={activeMonthFilter?.month === item.month && activeMonthFilter?.year === item.year}
+            onPress={() => setActiveMonthFilter(item)}
           />
         ))}
       </ScrollView>
@@ -312,6 +398,8 @@ export default function HistoryScreen() {
                 <TransactionItem
                   key={item.id_transacao}
                   id={item.id_transacao}
+                  id_carteira={item.id_carteira}
+                  usuario_nome={item.usuario_nome}
                   titulo={item.titulo}
                   valor={Number(item.valor)}
                   tipo={item.tipo}
@@ -341,7 +429,15 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.lg,
+  },
+  searchToggleBtn: {
+    padding: Spacing.xs,
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: FontSize.xxl,
@@ -356,11 +452,10 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 0,
     marginBottom: Spacing.md,
   },
   searchIcon: {
@@ -368,7 +463,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    paddingVertical: 14,
     fontSize: FontSize.md,
     color: Colors.textPrimary,
   },

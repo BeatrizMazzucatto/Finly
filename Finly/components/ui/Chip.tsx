@@ -24,22 +24,40 @@ export function Chip({
   size = "md",
   style,
 }: ChipProps) {
-  const chipColor = color || (selected ? Colors.primary : Colors.textMuted);
+  const isConjuntas = label === "Conjuntas" || color === Colors.jointPrimary;
+
+  let backgroundColor = Colors.surface;
+  let borderColor = Colors.border;
+  let textColor = Colors.textGray;
+
+  if (isConjuntas) {
+    if (selected) {
+      backgroundColor = Colors.jointPrimary;
+      borderColor = Colors.jointPrimary;
+      textColor = Colors.textInverse;
+    } else {
+      backgroundColor = Colors.jointLight;
+      borderColor = Colors.jointPrimary;
+      textColor = Colors.jointPrimary;
+    }
+  } else {
+    if (selected) {
+      backgroundColor = Colors.textPrimary;
+      borderColor = Colors.textPrimary;
+      textColor = Colors.textInverse;
+    } else {
+      backgroundColor = Colors.surface;
+      borderColor = Colors.border;
+      textColor = Colors.textGray;
+    }
+  }
 
   const chipStyles = [
     styles.chip,
     styles[`size_${size}`],
-    variant === "filled" && { backgroundColor: chipColor },
-    variant === "outlined" && { borderColor: chipColor, borderWidth: 1.5 },
-    selected && variant === "default" && { backgroundColor: chipColor + "15", borderColor: chipColor },
+    { backgroundColor, borderColor },
     style,
   ];
-
-  const textColor = variant === "filled" 
-    ? Colors.textInverse 
-    : selected 
-    ? chipColor 
-    : Colors.textSecondary;
 
   const content = (
     <>
@@ -77,24 +95,22 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.borderLight,
+    borderRadius: BorderRadius.xl, // 20px
     borderWidth: 1,
-    borderColor: "transparent",
   },
   size_sm: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   size_md: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
   },
   icon: {
     marginRight: Spacing.xs,
   },
   label: {
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold,
   },
   labelSize_sm: {
     fontSize: FontSize.xs,

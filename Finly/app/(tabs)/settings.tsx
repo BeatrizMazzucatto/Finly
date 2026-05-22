@@ -6,39 +6,32 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Switch,
   Alert,
   StatusBar,
+  Image,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/src/context/AuthContext";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
-import { Card, Button, ProgressBar } from "@/components/ui";
-import { formatCurrency, formatMoneyInput } from "@/utils/formatters";
-import { CATEGORIAS } from "@/constants/categories";
+import { formatMoneyInput } from "@/utils/formatters";
 
 const LIMITE_KEY = "finly_limite_gastos";
 const RENDA_KEY = "finly_renda_mensal";
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
-  const [limite, setLimite] = useState("");
-  const [renda, setRenda] = useState("");
+  const [limite, setLimite] = useState("3.000,00");
   const [editingLimite, setEditingLimite] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
-      const [limiteStored, rendaStored] = await Promise.all([
-        AsyncStorage.getItem(LIMITE_KEY),
-        AsyncStorage.getItem(RENDA_KEY),
-      ]);
-      if (limiteStored) setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
-      if (rendaStored) setRenda(Number(rendaStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
+      const limiteStored = await AsyncStorage.getItem(LIMITE_KEY);
+      if (limiteStored) {
+        setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
+      }
     }
     loadSettings();
   }, []);
@@ -55,26 +48,33 @@ export default function SettingsScreen() {
   }
 
   async function handleLogout() {
-    Alert.alert(
-      "Sair da conta",
-      "Tem certeza que deseja sair?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Sair",
-          style: "destructive",
-          onPress: async () => {
-            await logout();
-            router.replace("/(tabs)");
+    const doLogout = async () => {
+      await logout();
+      await AsyncStorage.removeItem("finly_onboarding_done");
+      router.replace("/onboarding");
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Sair da conta\n\nTem certeza que deseja sair?")) {
+        doLogout();
+      }
+    } else {
+      Alert.alert(
+        "Sair da conta",
+        "Tem certeza que deseja sair?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Sair",
+            style: "destructive",
+            onPress: doLogout,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   }
 
-  const limiteNum = parseFloat(limite.replace(/\./g, "").replace(",", ".")) || 0;
-  const rendaNum = parseFloat(renda.replace(/\./g, "").replace(",", ".")) || 0;
-  const limitePercent = rendaNum > 0 ? (limiteNum / rendaNum) * 100 : 0;
+  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.nome ?? "Lucas")}&background=4F46E5&color=fff`;
 
   return (
     <ScrollView
@@ -89,239 +89,92 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Configurações</Text>
       </View>
 
-      {/* Profile Card */}
-      <Card style={styles.profileCard}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user?.nome?.charAt(0).toUpperCase() ?? "U"}
-              </Text>
-            </View>
-            <Pressable style={styles.editAvatarBtn}>
-              <Feather name="camera" size={14} color={Colors.textInverse} />
-            </Pressable>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.nome ?? "Usuário"}</Text>
-            <Text style={styles.profileEmail}>{user?.email ?? "email@exemplo.com"}</Text>
-          </View>
-          <Pressable style={styles.editProfileBtn}>
-            <Feather name="edit-2" size={18} color={Colors.primary} />
-          </Pressable>
+      {/* Profile Section */}
+      <View style={styles.profileSection}>
+        <Image source={{ uri: avatarUrl }} style={styles.profileAvatar} />
+        <View>
+          <Text style={styles.profileName}>{user?.nome ?? "Lucas Silva"}</Text>
+          <Text style={styles.profileEmail}>{user?.email ?? "lucas.silva@email.com"}</Text>
         </View>
-      </Card>
+      </View>
 
-      {/* Limite de Gastos */}
-      <Card style={styles.limiteCard}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Feather name="shield" size={20} color={Colors.primary} />
-            <Text style={styles.sectionTitle}>Limite de Gastos Mensal</Text>
-          </View>
-          {!editingLimite && (
-            <Pressable onPress={() => setEditingLimite(true)}>
-              <Feather name="edit-2" size={18} color={Colors.primary} />
-            </Pressable>
-          )}
-        </View>
-
+      {/* Meu Limite de Gastos (Pessoal) */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Meu Limite de Gastos (Pessoal)</Text>
         {editingLimite ? (
-          <View style={styles.editContainer}>
+          <View style={styles.editLimitCard}>
             <View style={styles.editInputRow}>
               <Text style={styles.currencyPrefix}>R$</Text>
               <TextInput
-                style={styles.editInput}
+                style={styles.editLimitInput}
                 value={limite}
                 onChangeText={(text) => setLimite(formatMoneyInput(text))}
                 keyboardType="numeric"
                 autoFocus
               />
             </View>
-            <View style={styles.editActions}>
-              <Pressable style={styles.cancelBtn} onPress={() => setEditingLimite(false)}>
-                <Text style={styles.cancelBtnText}>Cancelar</Text>
+            <View style={styles.editLimitActions}>
+              <Pressable style={styles.editLimitSaveBtn} onPress={handleSaveLimite}>
+                <Feather name="check" size={16} color={Colors.textInverse} />
               </Pressable>
-              <Pressable style={styles.saveBtn} onPress={handleSaveLimite}>
-                <Feather name="check" size={18} color={Colors.textInverse} />
-                <Text style={styles.saveBtnText}>Salvar</Text>
+              <Pressable style={styles.editLimitCancelBtn} onPress={() => setEditingLimite(false)}>
+                <Feather name="x" size={16} color={Colors.textPrimary} />
               </Pressable>
             </View>
           </View>
         ) : (
-          <>
-            <Text style={styles.limiteValue}>R$ {limite || "0,00"}</Text>
-            <View style={styles.limiteInfo}>
-              <ProgressBar 
-                progress={limitePercent} 
-                color={Colors.primary}
-                height={8}
-              />
-              <Text style={styles.limitePercent}>
-                {limitePercent.toFixed(0)}% da sua renda mensal
-              </Text>
-            </View>
-          </>
+          <Pressable style={styles.limitDisplayCard} onPress={() => setEditingLimite(true)}>
+            <Text style={styles.limitDisplayValue}>R$ {limite || "0,00"}</Text>
+            <Feather name="edit-2" size={16} color={Colors.primary} />
+          </Pressable>
         )}
-      </Card>
+      </View>
 
-      {/* Categorias */}
-      <Card style={styles.sectionCard}>
+      {/* Settings Options Card */}
+      <View style={styles.menuCard}>
+        {/* Item 1: Gerenciar Categorias */}
         <Pressable style={styles.menuItem}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.warning + "15" }]}>
-              <Feather name="tag" size={20} color={Colors.warning} />
-            </View>
-            <View>
-              <Text style={styles.menuItemTitle}>Categorias</Text>
-              <Text style={styles.menuItemSubtitle}>{CATEGORIAS.length} categorias configuradas</Text>
-            </View>
+            <Feather name="tag" size={20} color={Colors.primary} style={styles.menuItemIcon} />
+            <Text style={styles.menuItemText}>Gerenciar Categorias</Text>
           </View>
-          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
+          <Feather name="chevron-right" size={20} color="#CBD5E1" />
         </Pressable>
 
         <View style={styles.menuDivider} />
 
+        {/* Item 2: Segurança e Senha */}
         <Pressable style={styles.menuItem}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.secondary + "15" }]}>
-              <Feather name="credit-card" size={20} color={Colors.secondary} />
-            </View>
-            <View>
-              <Text style={styles.menuItemTitle}>Carteiras</Text>
-              <Text style={styles.menuItemSubtitle}>Gerencie suas contas</Text>
-            </View>
+            <Feather name="shield" size={20} color={Colors.primary} style={styles.menuItemIcon} />
+            <Text style={styles.menuItemText}>Segurança e Senha</Text>
           </View>
-          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
+          <Feather name="chevron-right" size={20} color="#CBD5E1" />
         </Pressable>
 
         <View style={styles.menuDivider} />
 
-        <Pressable style={styles.menuItem}>
+        {/* Item 3: Backup de Dados */}
+        <View style={styles.menuItem}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.income + "15" }]}>
-              <Feather name="target" size={20} color={Colors.income} />
-            </View>
-            <View>
-              <Text style={styles.menuItemTitle}>Metas</Text>
-              <Text style={styles.menuItemSubtitle}>Defina objetivos financeiros</Text>
-            </View>
+            <Feather name="cloud" size={20} color={Colors.primary} style={styles.menuItemIcon} />
+            <Text style={styles.menuItemText}>Backup de Dados</Text>
           </View>
-          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
-        </Pressable>
-      </Card>
-
-      {/* Preferências */}
-      <Card style={styles.sectionCard}>
-        <Text style={styles.cardTitle}>Preferências</Text>
-
-        <View style={styles.preferenceItem}>
-          <View style={styles.preferenceLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.info + "15" }]}>
-              <Feather name="bell" size={20} color={Colors.info} />
-            </View>
-            <View>
-              <Text style={styles.preferenceTitle}>Notificações</Text>
-              <Text style={styles.preferenceSubtitle}>Alertas de gastos e lembretes</Text>
-            </View>
-          </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{ false: Colors.border, true: Colors.primary + "50" }}
-            thumbColor={notificationsEnabled ? Colors.primary : Colors.textMuted}
-          />
+          <Text style={styles.backupActiveBadge}>ATIVO</Text>
         </View>
 
         <View style={styles.menuDivider} />
 
-        <View style={styles.preferenceItem}>
-          <View style={styles.preferenceLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.textPrimary + "15" }]}>
-              <Feather name="moon" size={20} color={Colors.textPrimary} />
-            </View>
-            <View>
-              <Text style={styles.preferenceTitle}>Modo Escuro</Text>
-              <Text style={styles.preferenceSubtitle}>Em breve</Text>
-            </View>
-          </View>
-          <Switch
-            value={darkModeEnabled}
-            onValueChange={setDarkModeEnabled}
-            trackColor={{ false: Colors.border, true: Colors.primary + "50" }}
-            thumbColor={darkModeEnabled ? Colors.primary : Colors.textMuted}
-            disabled
-          />
-        </View>
-
-        <View style={styles.menuDivider} />
-
-        <View style={styles.preferenceItem}>
-          <View style={styles.preferenceLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.expense + "15" }]}>
-              <Feather name="lock" size={20} color={Colors.expense} />
-            </View>
-            <View>
-              <Text style={styles.preferenceTitle}>Biometria</Text>
-              <Text style={styles.preferenceSubtitle}>Desbloqueio com digital</Text>
-            </View>
-          </View>
-          <Switch
-            value={biometricEnabled}
-            onValueChange={setBiometricEnabled}
-            trackColor={{ false: Colors.border, true: Colors.primary + "50" }}
-            thumbColor={biometricEnabled ? Colors.primary : Colors.textMuted}
-          />
-        </View>
-      </Card>
-
-      {/* Suporte */}
-      <Card style={styles.sectionCard}>
-        <Text style={styles.cardTitle}>Suporte</Text>
-
-        <Pressable style={styles.menuItem}>
+        {/* Item 4: Sair da Conta */}
+        <Pressable style={styles.menuItem} onPress={handleLogout}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.textMuted + "15" }]}>
-              <Feather name="help-circle" size={20} color={Colors.textMuted} />
-            </View>
-            <Text style={styles.menuItemTitle}>Central de Ajuda</Text>
+            <Feather name="log-out" size={20} color={Colors.error} style={styles.menuItemIcon} />
+            <Text style={[styles.menuItemText, { color: Colors.error, fontWeight: FontWeight.semibold }]}>
+              Sair da Conta
+            </Text>
           </View>
-          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
         </Pressable>
-
-        <View style={styles.menuDivider} />
-
-        <Pressable style={styles.menuItem}>
-          <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.textMuted + "15" }]}>
-              <Feather name="message-circle" size={20} color={Colors.textMuted} />
-            </View>
-            <Text style={styles.menuItemTitle}>Fale Conosco</Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
-        </Pressable>
-
-        <View style={styles.menuDivider} />
-
-        <Pressable style={styles.menuItem}>
-          <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIcon, { backgroundColor: Colors.textMuted + "15" }]}>
-              <Feather name="file-text" size={20} color={Colors.textMuted} />
-            </View>
-            <Text style={styles.menuItemTitle}>Termos de Uso</Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
-        </Pressable>
-      </Card>
-
-      {/* Logout */}
-      <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Feather name="log-out" size={20} color={Colors.error} />
-        <Text style={styles.logoutText}>Sair da Conta</Text>
-      </Pressable>
-
-      {/* Version */}
-      <Text style={styles.version}>Finly v1.0.0</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -337,243 +190,151 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
-    marginBottom: Spacing.xl,
+    marginBottom: 20,
   },
   title: {
     fontSize: FontSize.xxl,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
-  profileCard: {
-    marginBottom: Spacing.lg,
-  },
-  profileHeader: {
+  profileSection: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.md,
+    gap: 16,
+    marginBottom: 30,
   },
-  avatarContainer: {
-    position: "relative",
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
-    color: Colors.textInverse,
-  },
-  editAvatarBtn: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.textSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: Colors.surface,
-  },
-  profileInfo: {
-    flex: 1,
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   profileName: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
+    fontSize: 20,
+    fontWeight: FontWeight.semibold,
     color: Colors.textPrimary,
   },
   profileEmail: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
+    fontSize: 14,
+    color: Colors.textGray,
     marginTop: 2,
   },
-  editProfileBtn: {
-    padding: Spacing.sm,
+  inputGroup: {
+    marginBottom: 20,
   },
-  limiteCard: {
-    marginBottom: Spacing.lg,
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: FontWeight.bold,
+    color: Colors.textGray,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  sectionHeader: {
+  limitDisplayCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xxl,
+    padding: 16,
+    ...Shadow.sm,
   },
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
+  limitDisplayValue: {
+    fontSize: 18,
+    fontWeight: "700",
     color: Colors.textPrimary,
   },
-  limiteValue: {
-    fontSize: 32,
-    fontWeight: FontWeight.bold,
-    color: Colors.primary,
-    marginBottom: Spacing.md,
-  },
-  limiteInfo: {
-    gap: Spacing.sm,
-  },
-  limitePercent: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-  },
-  editContainer: {
+  editLimitCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xxl,
+    padding: 16,
     gap: Spacing.md,
+    ...Shadow.sm,
   },
   editInputRow: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.background,
     borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  currencyPrefix: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Colors.primary,
-    marginRight: Spacing.sm,
-  },
-  editInput: {
-    flex: 1,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    paddingVertical: Spacing.md,
-  },
-  editActions: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  cancelBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  cancelBtnText: {
+  currencyPrefix: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textSecondary,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    marginRight: Spacing.xs,
   },
-  saveBtn: {
+  editLimitInput: {
     flex: 1,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    paddingVertical: Spacing.sm,
+  },
+  editLimitActions: {
     flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  editLimitSaveBtn: {
+    backgroundColor: Colors.success,
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
+  },
+  editLimitCancelBtn: {
+    backgroundColor: Colors.borderLight,
+    width: 36,
+    height: 36,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  saveBtnText: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textInverse,
-  },
-  sectionCard: {
-    marginBottom: Spacing.lg,
-  },
-  cardTitle: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    color: Colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: Spacing.md,
+  menuCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xxl,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    overflow: "hidden",
+    marginTop: 24,
+    ...Shadow.sm,
   },
   menuItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: Spacing.sm,
+    alignItems: "center",
   },
   menuItemLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.md,
+    gap: 12,
   },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+  menuItemIcon: {
+    width: 20,
+    textAlign: "center",
   },
-  menuItemTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: "500",
     color: Colors.textPrimary,
-  },
-  menuItemSubtitle: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    marginTop: 2,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.sm,
+    backgroundColor: "#F1F5F9",
   },
-  preferenceItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.sm,
-  },
-  preferenceLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    flex: 1,
-  },
-  preferenceTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-  },
-  preferenceSubtitle: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    backgroundColor: Colors.errorLight,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.error,
-    marginBottom: Spacing.xl,
-  },
-  logoutText: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    color: Colors.error,
-  },
-  version: {
-    textAlign: "center",
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    marginBottom: Spacing.xl,
+  backupActiveBadge: {
+    fontSize: 12,
+    color: "#10B981",
+    fontWeight: "600",
   },
 });

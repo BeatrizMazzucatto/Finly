@@ -64,6 +64,22 @@ export const Colors = {
     investimentos: "#10B981",
     outros: "#64748B",
   },
+  light: {
+    text: "#1E293B",
+    background: "#F8FAFC",
+    tint: "#4F46E5",
+    icon: "#64748B",
+    tabIconDefault: "#94A3B8",
+    tabIconSelected: "#4F46E5",
+  },
+  dark: {
+    text: "#F8FAFC",
+    background: "#0F172A",
+    tint: "#4F46E5",
+    icon: "#94A3B8",
+    tabIconDefault: "#475569",
+    tabIconSelected: "#4F46E5",
+  },
 };
 
 export const Spacing = {

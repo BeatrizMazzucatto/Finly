@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,6 +13,7 @@ import {
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { getTransactionsByUser } from "@/src/services/transactions";
@@ -20,6 +21,7 @@ import type { Transaction } from "@/src/types/api";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
 import { formatCurrency } from "@/utils/formatters";
 import { getCategoryColor, getCategoryIcon } from "@/constants/categories";
+import { TransactionItem } from "@/components/ui/TransactionItem";
 
 type WalletMode = "personal" | "joint";
 
@@ -35,44 +37,79 @@ function formatTime(dateStr: string) {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-function DonutChart({ total }: { total: number }) {
+function DonutChart({
+  total,
+  categoryTotals,
+  walletMode,
+}: {
+  total: number;
+  categoryTotals: [string, number][];
+  walletMode: WalletMode;
+}) {
   const size = 200;
   const stroke = 25;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const segments = [0.4, 0.3, 0.2, 0.1];
-  const colors = [
+
+  // Paleta conjunta: #9333EA, #A855F7, #C084FC, #E9D5FF
+  const jointColors = ["#9333EA", "#A855F7", "#C084FC", "#E9D5FF"];
+  const personalColors = [
     Colors.categories.alimentacao,
     Colors.categories.transporte,
     Colors.categories.saude,
     Colors.categories.lazer,
   ];
 
+  const colors = walletMode === "joint" ? jointColors : personalColors;
+
+  let segments: number[] = [];
+  if (total > 0 && categoryTotals.length > 0) {
+    segments = categoryTotals.map(([_, val]) => val / total);
+    const sum = segments.reduce((a, b) => a + b, 0);
+    if (sum < 1.0) {
+      segments.push(1.0 - sum);
+    }
+  } else {
+    segments = [1.0];
+  }
+
   let offset = 0;
 
   return (
     <View style={styles.chartRing}>
       <Svg width={size} height={size}>
-        {segments.map((value, index) => {
-          const dash = circumference * value;
-          const circle = (
-            <Circle
-              key={index}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              stroke={colors[index]}
-              strokeWidth={stroke}
-              fill="transparent"
-              strokeDasharray={`${dash} ${circumference - dash}`}
-              strokeDashoffset={-offset}
-              rotation={-90}
-              origin={`${size / 2}, ${size / 2}`}
-            />
-          );
-          offset += dash;
-          return circle;
-        })}
+        {total === 0 ? (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={Colors.border}
+            strokeWidth={stroke}
+            fill="transparent"
+          />
+        ) : (
+          segments.map((value, index) => {
+            const dash = circumference * value;
+            const strokeColor = colors[index % colors.length] || Colors.border;
+            const circle = (
+              <Circle
+                key={index}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                stroke={strokeColor}
+                strokeWidth={stroke}
+                fill="transparent"
+                strokeDasharray={`${dash} ${circumference - dash}`}
+                strokeDashoffset={-offset}
+                rotation={-90}
+                origin={`${size / 2}, ${size / 2}`}
+              />
+            );
+            offset += dash;
+            return circle;
+          })
+        )}
       </Svg>
       <View style={styles.chartCenter}>
         <Text style={styles.chartCenterLabel}>Despesas</Text>
@@ -90,13 +127,34 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [walletMode, setWalletMode] = useState<WalletMode>("personal");
 
+  useEffect(() => {
+    AsyncStorage.getItem("finly_id_carteira").then((val) => {
+      if (val) {
+        setWalletMode(Number(val) === 3 ? "joint" : "personal");
+      }
+    });
+  }, []);
+
+  const handleWalletModeChange = async (mode: WalletMode) => {
+    setWalletMode(mode);
+    await AsyncStorage.setItem("finly_id_carteira", mode === "joint" ? "3" : "1");
+  };
+
+  const filteredTransactions = useMemo(() => {
+    if (walletMode === "personal") {
+      return transactions.filter((t) => t.id_carteira !== 3);
+    } else {
+      return transactions.filter((t) => t.id_carteira === 3);
+    }
+  }, [transactions, walletMode]);
+
   const despesas = useMemo(
-    () => transactions.filter((t) => t.tipo === "DESPESA"),
-    [transactions]
+    () => filteredTransactions.filter((t) => t.tipo === "DESPESA"),
+    [filteredTransactions]
   );
   const receitas = useMemo(
-    () => transactions.filter((t) => t.tipo === "RECEITA"),
-    [transactions]
+    () => filteredTransactions.filter((t) => t.tipo === "RECEITA"),
+    [filteredTransactions]
   );
   const totalDespesas = useMemo(
     () => despesas.reduce((sum, item) => sum + Number(item.valor), 0),
@@ -121,10 +179,10 @@ export default function HomeScreen() {
 
   const recentTransactions = useMemo(
     () =>
-      [...transactions].sort(
+      [...filteredTransactions].sort(
         (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
       ).slice(0, 4),
-    [transactions]
+    [filteredTransactions]
   );
 
   async function loadData(isPullToRefresh = false) {
@@ -174,7 +232,7 @@ export default function HomeScreen() {
         <View style={styles.walletToggle}>
           <Pressable
             style={[styles.toggleButton, walletMode === "personal" && styles.toggleButtonActivePersonal]}
-            onPress={() => setWalletMode("personal")}
+            onPress={() => handleWalletModeChange("personal")}
           >
             <Text style={[styles.toggleText, walletMode === "personal" && styles.toggleTextActivePersonal]}>
               Minha Carteira
@@ -182,7 +240,7 @@ export default function HomeScreen() {
           </Pressable>
           <Pressable
             style={[styles.toggleButton, walletMode === "joint" && styles.toggleButtonActiveJoint]}
-            onPress={() => setWalletMode("joint")}
+            onPress={() => handleWalletModeChange("joint")}
           >
             <Text style={[styles.toggleText, walletMode === "joint" && styles.toggleTextActiveJoint]}>
               Carteira Conjunta
@@ -191,11 +249,16 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.balanceContainer}>
-          <Text style={styles.balanceLabel}>Saldo Disponível</Text>
-          <Text style={styles.balanceValue}>{formatCurrency(saldo)}</Text>
+          <Text style={styles.balanceLabel}>
+            {walletMode === "joint" ? "Saldo Conjunto" : "Saldo Pessoal"}
+          </Text>
+          <Text style={styles.balanceValue}>
+            <Text style={styles.balanceCurrency}>R$ </Text>
+            {formatCurrency(saldo).replace("R$", "").trim()}
+          </Text>
         </View>
 
-        <DonutChart total={totalDespesas} />
+        <DonutChart total={totalDespesas} categoryTotals={categoryTotals} walletMode={walletMode} />
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Gastos por Categoria</Text>
@@ -206,16 +269,24 @@ export default function HomeScreen() {
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
           {categoryTotals.length === 0 ? (
-            <View style={[styles.categoryCard, { backgroundColor: Colors.categories.outros }]}>
+            <View style={[styles.categoryCard, { backgroundColor: walletMode === "joint" ? Colors.jointLight : Colors.categories.outros }]}>
               <View style={[styles.categoryIcon, { backgroundColor: Colors.surface }]}>
-                <Feather name="tag" size={18} color={Colors.categoryIcons.outros} />
+                <Feather name="tag" size={18} color={walletMode === "joint" ? Colors.jointPrimary : Colors.categoryIcons.outros} />
               </View>
               <Text style={styles.categoryName}>Sem gastos</Text>
               <Text style={styles.categoryValue}>R$ 0,00</Text>
             </View>
           ) : (
             categoryTotals.map(([nome, total], index) => {
-              const palette = CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
+              const JOINT_CATEGORY_PALETTE = [
+                { bg: "#E9D5FF", icon: "#9333EA" },
+                { bg: "#F3E8FF", icon: "#9333EA" },
+                { bg: "#D8B4FE", icon: "#9333EA" },
+                { bg: "#FAF5FF", icon: "#9333EA" },
+              ];
+              const palette = walletMode === "joint"
+                ? JOINT_CATEGORY_PALETTE[index % JOINT_CATEGORY_PALETTE.length]
+                : CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
               const icon = getCategoryIcon(nome);
               return (
                 <View key={nome} style={[styles.categoryCard, { backgroundColor: palette.bg }]}>
@@ -245,28 +316,20 @@ export default function HomeScreen() {
             <Text style={styles.emptyText}>Nenhuma transação recente.</Text>
           </View>
         ) : (
-          recentTransactions.map((item) => {
-            const isExpense = item.tipo === "DESPESA";
-            const icon = getCategoryIcon(item.categoria ?? "Outros");
-            const bg = getCategoryColor(item.categoria ?? "Outros");
-            return (
-              <View key={item.id_transacao} style={styles.txItem}>
-                <View style={[styles.txIcon, { backgroundColor: bg }]}>
-                  <Feather name={icon} size={20} color={Colors.textPrimary} />
-                </View>
-                <View style={styles.txInfo}>
-                  <Text style={styles.txTitle}>{item.titulo}</Text>
-                  <Text style={styles.txMeta}>
-                    {item.categoria ?? "Sem categoria"} • {formatTime(item.data_transacao)}
-                  </Text>
-                </View>
-                <Text style={[styles.txValue, !isExpense && styles.txValuePositive]}>
-                  {isExpense ? "- " : "+ "}
-                  {formatCurrency(Number(item.valor))}
-                </Text>
-              </View>
-            );
-          })
+          recentTransactions.map((item) => (
+            <TransactionItem
+              key={item.id_transacao}
+              id={item.id_transacao}
+              id_carteira={item.id_carteira}
+              usuario_nome={item.usuario_nome}
+              titulo={item.titulo}
+              valor={Number(item.valor)}
+              tipo={item.tipo}
+              categoria={item.categoria ?? "Outros"}
+              data={item.data_transacao}
+              style={{ marginBottom: Spacing.md }}
+            />
+          ))
         )}
       </ScrollView>
     </View>
@@ -298,11 +361,11 @@ const styles = StyleSheet.create({
   },
   headerGreeting: {
     color: Colors.textGray,
-    fontSize: FontSize.xs,
+    fontSize: 12,
     fontWeight: FontWeight.semibold,
   },
   headerName: {
-    fontSize: FontSize.lg,
+    fontSize: 18,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
@@ -346,7 +409,7 @@ const styles = StyleSheet.create({
   toggleText: {
     color: Colors.textGray,
     fontWeight: FontWeight.semibold,
-    fontSize: FontSize.sm,
+    fontSize: 14,
   },
   toggleTextActivePersonal: {
     color: Colors.primary,
@@ -361,7 +424,7 @@ const styles = StyleSheet.create({
   balanceLabel: {
     color: Colors.textGray,
     fontWeight: FontWeight.medium,
-    fontSize: FontSize.sm,
+    fontSize: 14,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -433,12 +496,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   categoryName: {
-    fontSize: FontSize.sm,
+    fontSize: 15,
     fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
   categoryValue: {
-    fontSize: FontSize.xs,
+    fontSize: 12,
     color: Colors.textGray,
   },
   txItem: {
