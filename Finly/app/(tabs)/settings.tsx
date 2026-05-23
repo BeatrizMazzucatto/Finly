@@ -26,15 +26,32 @@ export default function SettingsScreen() {
   const [limite, setLimite] = useState("3.000,00");
   const [editingLimite, setEditingLimite] = useState(false);
 
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [showCategories, setShowCategories] = useState(false);
+
   useEffect(() => {
     async function loadSettings() {
-      const limiteStored = await AsyncStorage.getItem(LIMITE_KEY);
-      if (limiteStored) {
-        setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
-      }
+      const [limiteStored, rendaStored, customCatsStored] = await Promise.all([
+        AsyncStorage.getItem(LIMITE_KEY),
+        AsyncStorage.getItem(RENDA_KEY),
+        AsyncStorage.getItem("finly_custom_categories")
+      ]);
+      if (limiteStored) setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
+      if (rendaStored) setRenda(Number(rendaStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
+      if (customCatsStored) setCustomCategories(JSON.parse(customCatsStored));
     }
     loadSettings();
   }, []);
+
+  async function handleAddCategory() {
+    if (!newCategoryName.trim()) return;
+    const updated = [...customCategories, newCategoryName.trim()];
+    setCustomCategories(updated);
+    setNewCategoryName("");
+    await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
+    Alert.alert("Sucesso", "Categoria criada!");
+  }
 
   async function handleSaveLimite() {
     const limiteNum = parseFloat(limite.replace(/\./g, "").replace(",", ".")) || 0;
@@ -48,26 +65,17 @@ export default function SettingsScreen() {
   }
 
   async function handleLogout() {
-    const doLogout = async () => {
-      await logout();
-      await AsyncStorage.removeItem("finly_onboarding_done");
-      router.replace("/onboarding");
-    };
-
-    if (Platform.OS === "web") {
-      if (window.confirm("Sair da conta\n\nTem certeza que deseja sair?")) {
-        doLogout();
-      }
-    } else {
-      Alert.alert(
-        "Sair da conta",
-        "Tem certeza que deseja sair?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Sair",
-            style: "destructive",
-            onPress: doLogout,
+    Alert.alert(
+      "Sair da conta",
+      "Tem certeza que deseja sair?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sair",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/login");
           },
         ]
       );
@@ -130,16 +138,49 @@ export default function SettingsScreen() {
         )}
       </View>
 
-      {/* Settings Options Card */}
-      <View style={styles.menuCard}>
-        {/* Item 1: Gerenciar Categorias */}
-        <Pressable style={styles.menuItem}>
+      {/* Categorias */}
+      <Card style={styles.sectionCard}>
+        <Pressable style={styles.menuItem} onPress={() => setShowCategories(!showCategories)}>
           <View style={styles.menuItemLeft}>
-            <Feather name="tag" size={20} color={Colors.primary} style={styles.menuItemIcon} />
-            <Text style={styles.menuItemText}>Gerenciar Categorias</Text>
+            <View style={[styles.menuIcon, { backgroundColor: Colors.warning + "15" }]}>
+              <Feather name="tag" size={20} color={Colors.warning} />
+            </View>
+            <View>
+              <Text style={styles.menuItemTitle}>Categorias</Text>
+              <Text style={styles.menuItemSubtitle}>{CATEGORIAS.length + customCategories.length} categorias configuradas</Text>
+            </View>
           </View>
-          <Feather name="chevron-right" size={20} color="#CBD5E1" />
+          <Feather name={showCategories ? "chevron-down" : "chevron-right"} size={20} color={Colors.textMuted} />
         </Pressable>
+
+        {showCategories && (
+          <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginTop: 10, marginBottom: 10 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 10, color: Colors.textPrimary }}>Minhas Categorias Customizadas</Text>
+            {customCategories.length === 0 ? (
+              <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 10 }}>Nenhuma categoria customizada criada ainda.</Text>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
+                {customCategories.map((c, idx) => (
+                  <View key={idx} style={{ backgroundColor: Colors.primary + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                    <Text style={{ color: Colors.primary, fontWeight: '600', fontSize: 12 }}>{c}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput 
+                style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]} 
+                placeholder="Nome da categoria..." 
+                value={newCategoryName} 
+                onChangeText={setNewCategoryName} 
+              />
+              <Pressable style={[styles.saveBtn, { paddingHorizontal: 20, height: 46 }]} onPress={handleAddCategory}>
+                <Feather name="plus" size={18} color="#fff" />
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         <View style={styles.menuDivider} />
 
