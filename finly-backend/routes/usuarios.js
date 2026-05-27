@@ -61,16 +61,29 @@ router.post("/", (req, res) => {
 
   db.query(sql, [nome, email.trim().toLowerCase(), senha], (err, result) => {
     if (err) {
-      if (err.code === "ER_DUP_ENTRY") {
+      if (err.code === "ER_DUP_ENTRY" || err.code === "23505") { // 23505 is PostgreSQL unique constraint violation
         return res.status(409).json({ erro: "Email já cadastrado" });
       }
       console.error("Erro ao criar usuário:", err);
       return res.status(500).json({ erro: "Erro ao criar usuário" });
     }
 
-    return res.status(201).json({
-      mensagem: "Usuário criado com sucesso",
-      id_usuario: result.rows[0].id_usuario,
+    const newUserId = result.rows[0].id_usuario;
+
+    // Vincula automaticamente às carteiras 1 (Pessoal) e 3 (Conjunta)
+    const linkSql = `
+      INSERT INTO usuarios_carteiras (id_usuario, id_carteira, papel, renda_mensal_alocada)
+      VALUES ($1, 1, 'PROPRIETARIO', 0.00), ($1, 3, 'MEMBRO', 0.00)
+      ON CONFLICT (id_usuario, id_carteira) DO NOTHING
+    `;
+    db.query(linkSql, [newUserId], (linkErr) => {
+      if (linkErr) {
+        console.error("Erro ao vincular carteiras padrão ao novo usuário:", linkErr);
+      }
+      return res.status(201).json({
+        mensagem: "Usuário criado com sucesso",
+        id_usuario: newUserId,
+      });
     });
   });
 });

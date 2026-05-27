@@ -1,4 +1,6 @@
-import { Platform, StyleSheet, View, type ReactNode } from "react-native";
+import React from "react";
+import { Platform, StyleSheet, View } from "react-native";
+import type { ReactNode } from "react";
 
 const PHONE_WIDTH = 390;
 const PHONE_HEIGHT = 844;

@@ -74,6 +74,9 @@ router.get("/:id_usuario", (req, res) => {
   let sql = `
     SELECT
       t.id_transacao,
+      t.id_carteira,
+      t.id_usuario,
+      u.nome AS usuario_nome,
       t.titulo,
       t.tipo,
       t.valor,
@@ -81,7 +84,10 @@ router.get("/:id_usuario", (req, res) => {
       c.nome AS categoria
     FROM transacoes t
     LEFT JOIN categorias c ON t.id_categoria = c.id_categoria
-    WHERE t.id_usuario = $${paramCount++}
+    LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario
+    WHERE t.id_carteira IN (
+      SELECT id_carteira FROM usuarios_carteiras WHERE id_usuario = $${paramCount++}
+    )
   `;
 
   const params = [id_usuario];
@@ -105,7 +111,7 @@ router.get("/:id_usuario", (req, res) => {
     }
 
     if (!result || result.rows.length === 0) {
-      return res.json({ mensagem: "Nenhuma transação encontrada" });
+      return res.json([]);
     }
 
     res.json(result.rows);

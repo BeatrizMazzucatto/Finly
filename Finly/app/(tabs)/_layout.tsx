@@ -38,7 +38,7 @@ export default function TabsLayout() {
           title: "",
           tabBarIcon: () => (
             <View style={styles.addButton}>
-              <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.addGradient}>
+              <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.addGradient}>
                 <Feather name="plus" size={24} color={Colors.textInverse} />
               </LinearGradient>
             </View>
@@ -53,7 +53,7 @@ export default function TabsLayout() {
               style={styles.addButtonContainer}
             >
               <View style={styles.addButton}>
-                <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.addGradient}>
+                <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.addGradient}>
                   <Feather name="plus" size={24} color={Colors.textInverse} />
                 </LinearGradient>
               </View>
@@ -86,6 +86,7 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen name="statistics" options={{ href: null }} />
+      <Tabs.Screen name="explore" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -93,7 +94,7 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    backgroundColor: "rgba(255,255,255,0.92)",
+    backgroundColor: "rgba(255,255,255,0.85)",
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.3)",
     height: 85,

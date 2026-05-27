@@ -12,14 +12,16 @@ import {
   TextInput,
   View,
   StatusBar,
+  Switch,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/src/context/AuthContext";
 import { apiRequest } from "@/src/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
 import { CATEGORIAS } from "@/constants/categories";
-import { formatMoneyInput } from "@/utils/formatters";
+import { formatMoneyInput, parseMoneyInput } from "@/utils/formatters";
 
 const CARTEIRA_KEY = "finly_id_carteira";
 
@@ -27,6 +29,14 @@ interface Categoria {
   id_categoria: number;
   nome: string;
   cor_hex: string;
+}
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") {
+    alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
 }
 
 export default function TransactionFormScreen() {
@@ -39,6 +49,7 @@ export default function TransactionFormScreen() {
     categoria_nome?: string;
     id_categoria?: string;
     data_transacao?: string;
+    id_carteira?: string;
   }>();
 
   const isEditing = !!params.id_transacao;
@@ -58,6 +69,27 @@ export default function TransactionFormScreen() {
   const [loadingCats, setLoadingCats] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isConjunta, setIsConjunta] = useState(false);
+
+  const dismiss = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
+  useEffect(() => {
+    if (params.id_carteira) {
+      setIsConjunta(Number(params.id_carteira) === 3);
+    } else {
+      AsyncStorage.getItem(CARTEIRA_KEY).then((val) => {
+        if (val) {
+          setIsConjunta(Number(val) === 3);
+        }
+      });
+    }
+  }, [params.id_carteira]);
 
   function handleValorChange(text: string) {
     setValor(formatMoneyInput(text));
@@ -106,8 +138,8 @@ export default function TransactionFormScreen() {
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!titulo.trim()) errs.titulo = "Título é obrigatório";
-    const num = parseFloat(valor.replace(/\./g, "").replace(",", "."));
-    if (isNaN(num) || num === 0) errs.valor = "Insira um valor válido";
+    const num = parseMoneyInput(valor);
+    if (num <= 0) errs.valor = "Insira um valor válido";
     if (!idCategoria) errs.categoria = "Selecione uma categoria";
     const dataISO = parseDataToISO(data);
     if (!dataISO) errs.data = "Data inválida";
@@ -122,9 +154,8 @@ export default function TransactionFormScreen() {
     setSaving(true);
     try {
       const dataISO = parseDataToISO(data)!;
-      const valorNum = Math.abs(parseFloat(valor.replace(/\./g, "").replace(",", ".")));
-      const carteiraStored = await AsyncStorage.getItem(CARTEIRA_KEY);
-      const idCarteira = carteiraStored ? Number(carteiraStored) : 1;
+      const valorNum = Math.abs(parseMoneyInput(valor));
+      const idCarteira = isConjunta ? 3 : 1;
 
       const payload = {
         id_carteira: idCarteira,
@@ -142,17 +173,17 @@ export default function TransactionFormScreen() {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        Alert.alert("Sucesso", "Transação atualizada!");
+        showAlert("Sucesso", "Transação atualizada!");
       } else {
         await apiRequest("/transacoes", {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        Alert.alert("Sucesso", "Transação cadastrada!");
+        showAlert("Sucesso", "Transação cadastrada!");
       }
-      router.back();
+      dismiss();
     } catch (err) {
-      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível salvar.");
+      showAlert("Erro", err instanceof Error ? err.message : "Não foi possível salvar.");
     } finally {
       setSaving(false);
     }
@@ -170,7 +201,7 @@ export default function TransactionFormScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+        <Pressable style={styles.closeButton} onPress={dismiss}>
           <Feather name="x" size={24} color={Colors.textPrimary} />
         </Pressable>
         <Text style={styles.headerTitle}>
@@ -189,18 +220,13 @@ export default function TransactionFormScreen() {
           <Pressable
             style={[
               styles.tipoButton,
-              tipo === "DESPESA" && styles.tipoButtonExpense,
+              tipo === "DESPESA" && styles.tipoButtonActiveExpense,
             ]}
             onPress={() => setTipo("DESPESA")}
           >
-            <Feather 
-              name="arrow-down-circle" 
-              size={20} 
-              color={tipo === "DESPESA" ? Colors.error : Colors.textMuted} 
-            />
             <Text style={[
               styles.tipoText,
-              tipo === "DESPESA" && styles.tipoTextExpense,
+              tipo === "DESPESA" && styles.tipoTextActiveExpense,
             ]}>
               Despesa
             </Text>
@@ -208,18 +234,13 @@ export default function TransactionFormScreen() {
           <Pressable
             style={[
               styles.tipoButton,
-              tipo === "RECEITA" && styles.tipoButtonIncome,
+              tipo === "RECEITA" && styles.tipoButtonActiveIncome,
             ]}
             onPress={() => setTipo("RECEITA")}
           >
-            <Feather 
-              name="arrow-up-circle" 
-              size={20} 
-              color={tipo === "RECEITA" ? Colors.income : Colors.textMuted} 
-            />
             <Text style={[
               styles.tipoText,
-              tipo === "RECEITA" && styles.tipoTextIncome,
+              tipo === "RECEITA" && styles.tipoTextActiveIncome,
             ]}>
               Receita
             </Text>
@@ -227,32 +248,96 @@ export default function TransactionFormScreen() {
         </View>
 
         {/* Valor */}
-        <View style={styles.valorContainer}>
-          <Text style={[
-            styles.valorPrefix,
-            { color: tipo === "DESPESA" ? Colors.error : Colors.income },
-          ]}>
-            {tipo === "DESPESA" ? "-" : "+"} R$
-          </Text>
-          <TextInput
-            style={[
-              styles.valorInput,
-              { color: tipo === "DESPESA" ? Colors.error : Colors.income },
-            ]}
-            placeholder="0,00"
-            placeholderTextColor={Colors.textMuted}
-            keyboardType="numeric"
-            value={valor}
-            onChangeText={handleValorChange}
-          />
-        </View>
+        <TextInput
+          style={styles.valorInput}
+          placeholder="R$ 0,00"
+          placeholderTextColor={Colors.textMuted}
+          keyboardType="numeric"
+          value={valor ? (valor.startsWith("R$") ? valor : `R$ ${valor}`) : ""}
+          onChangeText={(text) => handleValorChange(text.replace(/^R\$\s?/, ""))}
+        />
         {errors.valor && <Text style={styles.errorText}>{errors.valor}</Text>}
+
+        {/* Context Selector: Pessoal vs Conjunto */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>TIPO DE LANÇAMENTO</Text>
+          <View style={{ gap: 10, marginBottom: 12 }}>
+            {/* Option 1: Pessoal */}
+            <Pressable
+              style={[
+                styles.contextCard,
+                !isConjunta && styles.contextCardActivePersonal,
+              ]}
+              onPress={() => setIsConjunta(false)}
+            >
+              <View style={[
+                styles.contextIconContainer,
+                { backgroundColor: !isConjunta ? Colors.primaryLight : "#F1F5F9" }
+              ]}>
+                <Feather 
+                  name="user" 
+                  size={20} 
+                  color={!isConjunta ? Colors.primary : Colors.textGray} 
+                />
+              </View>
+              <View style={styles.contextTextContainer}>
+                <Text style={[
+                  styles.contextTitle,
+                  !isConjunta && { color: Colors.primary, fontWeight: FontWeight.bold }
+                ]}>
+                  Lançamento Pessoal
+                </Text>
+                <Text style={styles.contextSubtitle}>Somente minha carteira</Text>
+              </View>
+              <View style={[
+                styles.contextRadio,
+                !isConjunta && { borderColor: Colors.primary, backgroundColor: Colors.primary }
+              ]}>
+                {!isConjunta && <View style={styles.contextRadioInner} />}
+              </View>
+            </Pressable>
+
+            {/* Option 2: Conjunto */}
+            <Pressable
+              style={[
+                styles.contextCard,
+                isConjunta && styles.contextCardActiveJoint,
+              ]}
+              onPress={() => setIsConjunta(true)}
+            >
+              <View style={[
+                styles.contextIconContainer,
+                { backgroundColor: isConjunta ? Colors.jointLight : "#F1F5F9" }
+              ]}>
+                <Feather 
+                  name="users" 
+                  size={20} 
+                  color={isConjunta ? Colors.jointPrimary : Colors.textGray} 
+                />
+              </View>
+              <View style={styles.contextTextContainer}>
+                <Text style={[
+                  styles.contextTitle,
+                  isConjunta && { color: Colors.jointPrimary, fontWeight: FontWeight.bold }
+                ]}>
+                  Lançamento Conjunto
+                </Text>
+                <Text style={styles.contextSubtitle}>Compartilhado com Família</Text>
+              </View>
+              <View style={[
+                styles.contextRadio,
+                isConjunta && { borderColor: Colors.jointPrimary, backgroundColor: Colors.jointPrimary }
+              ]}>
+                {isConjunta && <View style={styles.contextRadioInner} />}
+              </View>
+            </Pressable>
+          </View>
+        </View>
 
         {/* Título */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>DESCRIÇÃO</Text>
           <View style={[styles.inputContainer, errors.titulo && styles.inputError]}>
-            <Feather name="edit-3" size={20} color={Colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Ex: Mercado, Salário..."
@@ -268,7 +353,6 @@ export default function TransactionFormScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>DATA</Text>
           <View style={[styles.inputContainer, errors.data && styles.inputError]}>
-            <Feather name="calendar" size={20} color={Colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="DD/MM/AAAA"
@@ -331,25 +415,29 @@ export default function TransactionFormScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
+        <Pressable style={styles.cancelButton} onPress={dismiss}>
+          <Text style={styles.cancelButtonText}>Cancelar</Text>
+        </Pressable>
+
         <Pressable
           style={[styles.saveButton, saving && styles.buttonDisabled]}
           onPress={handleSalvar}
           disabled={saving}
         >
-          {saving ? (
-            <ActivityIndicator color={Colors.textInverse} />
-          ) : (
-            <>
-              <Feather name="check" size={20} color={Colors.textInverse} />
+          <LinearGradient
+            colors={isConjunta ? ["#9333EA", "#C084FC"] : ["#4F46E5", "#3B82F6"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.saveGradient}
+          >
+            {saving ? (
+              <ActivityIndicator color={Colors.textInverse} />
+            ) : (
               <Text style={styles.saveButtonText}>
-                {isEditing ? "Salvar Alterações" : "Salvar Transação"}
+                {isEditing ? "Salvar" : "Salvar"}
               </Text>
-            </>
-          )}
-        </Pressable>
-
-        <Pressable style={styles.cancelButton} onPress={() => router.back()}>
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
+            )}
+          </LinearGradient>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -393,56 +481,46 @@ const styles = StyleSheet.create({
   },
   tipoContainer: {
     flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
+    backgroundColor: "#F1F5F9",
+    borderRadius: BorderRadius.xl, // 20px
+    padding: 6,
+    marginBottom: 24,
   },
   tipoButton: {
     flex: 1,
-    flexDirection: "row",
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.md,
+  },
+  tipoButtonActiveExpense: {
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  tipoButtonExpense: {
-    backgroundColor: Colors.expenseLight,
-    borderColor: Colors.expense,
-  },
-  tipoButtonIncome: {
-    backgroundColor: Colors.incomeLight,
-    borderColor: Colors.income,
+  tipoButtonActiveIncome: {
+    backgroundColor: Colors.surface,
+    ...Shadow.sm,
   },
   tipoText: {
-    fontSize: FontSize.md,
+    fontSize: 16,
     fontWeight: FontWeight.semibold,
-    color: Colors.textMuted,
+    color: Colors.textGray,
   },
-  tipoTextExpense: {
-    color: Colors.expense,
+  tipoTextActiveExpense: {
+    color: Colors.error,
   },
-  tipoTextIncome: {
-    color: Colors.income,
-  },
-  valorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.xxl,
-    marginBottom: Spacing.lg,
-  },
-  valorPrefix: {
-    fontSize: 28,
-    fontWeight: FontWeight.bold,
+  tipoTextActiveIncome: {
+    color: Colors.success,
   },
   valorInput: {
-    fontSize: 48,
-    fontWeight: FontWeight.bold,
+    fontSize: 40,
+    fontWeight: "800",
+    color: Colors.textPrimary,
     textAlign: "center",
-    minWidth: 150,
+    width: "100%",
+    marginBottom: 20,
+    paddingVertical: 10,
   },
   inputGroup: {
     marginBottom: Spacing.lg,
@@ -457,11 +535,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
   inputError: {
     borderColor: Colors.error,
@@ -471,7 +549,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    paddingVertical: Spacing.lg,
+    paddingVertical: 16,
     fontSize: FontSize.md,
     color: Colors.textPrimary,
   },
@@ -509,38 +587,100 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   footer: {
+    flexDirection: "row",
     padding: Spacing.xl,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: 35,
     backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    gap: Spacing.md,
+    gap: 12,
   },
   saveButton: {
+    flex: 1,
+    height: 56,
+    borderRadius: 16,
+    overflow: "hidden",
+    ...Shadow.md,
+  },
+  saveGradient: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primary,
-    ...Shadow.md,
+    paddingHorizontal: 16,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   saveButtonText: {
-    fontSize: FontSize.md,
+    fontSize: 16,
     fontWeight: FontWeight.bold,
     color: Colors.textInverse,
   },
   cancelButton: {
+    flex: 1,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
+    justifyContent: "center",
+  },
+  contextCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    gap: Spacing.md,
+  },
+  contextCardActivePersonal: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + "05",
+  },
+  contextCardActiveJoint: {
+    borderColor: Colors.jointPrimary,
+    backgroundColor: Colors.jointPrimary + "05",
+  },
+  contextIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contextTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  contextTitle: {
+    fontSize: 15,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
+  },
+  contextSubtitle: {
+    fontSize: 12,
+    color: Colors.textGray,
+  },
+  contextRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contextRadioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.surface,
   },
   cancelButtonText: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    textDecorationLine: "underline",
+    fontSize: 16,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textPrimary,
   },
 });
