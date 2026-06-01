@@ -7,19 +7,22 @@ export type TransactionPayload = {
   tipo: "RECEITA" | "DESPESA";
   valor: number;
   categoria: string;
+  carteira: "PESSOAL" | "CONJUNTA";
 };
 
 type TransactionModalProps = {
   visible: boolean;
   onClose: () => void;
   onSave: (payload: TransactionPayload) => Promise<void>;
+  hasJointWallet?: boolean;
 };
 
-export function TransactionModal({ visible, onClose, onSave }: TransactionModalProps) {
+export function TransactionModal({ visible, onClose, onSave, hasJointWallet = false }: TransactionModalProps) {
   const [txTipo, setTxTipo] = useState<"RECEITA" | "DESPESA">("DESPESA");
   const [txValor, setTxValor] = useState("");
   const [txTitulo, setTxTitulo] = useState("");
   const [txCategoria, setTxCategoria] = useState("Alimentação");
+  const [txCarteira, setTxCarteira] = useState<"PESSOAL" | "CONJUNTA">("PESSOAL");
 
   // Reseta os campos toda vez que o modal é fechado
   useEffect(() => {
@@ -28,6 +31,7 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
       setTxTitulo("");
       setTxTipo("DESPESA");
       setTxCategoria("Alimentação");
+      setTxCarteira("PESSOAL");
     }
   }, [visible]);
 
@@ -37,6 +41,7 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
     setTxTitulo("");
     setTxTipo("DESPESA");
     setTxCategoria("Alimentação");
+    setTxCarteira("PESSOAL");
     onClose();
   };
 
@@ -51,7 +56,8 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
         titulo: txTitulo,
         tipo: txTipo,
         valor: Number(txValor),
-        categoria: txCategoria
+        categoria: txCategoria,
+        carteira: txCarteira
       });
 
       // Reset state after successful save
@@ -59,6 +65,7 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
       setTxTitulo("");
       setTxTipo("DESPESA");
       setTxCategoria("Alimentação");
+      setTxCarteira("PESSOAL");
     } catch (err) {
         // Error handling is managed by the parent, but we won't reset state if it fails
     }
@@ -85,6 +92,20 @@ export function TransactionModal({ visible, onClose, onSave }: TransactionModalP
               <Text style={{color: txTipo === 'RECEITA' ? 'white' : '#64748B', fontWeight: 'bold'}}>Receita</Text>
             </Pressable>
           </View>
+          
+          {hasJointWallet && (
+            <>
+              <Text style={styles.label}>Para qual conta?</Text>
+              <View style={styles.typeSelector}>
+                <Pressable style={[styles.typeBtn, txCarteira === 'PESSOAL' && styles.typeBtnActivePersonal]} onPress={() => setTxCarteira('PESSOAL')}>
+                  <Text style={{color: txCarteira === 'PESSOAL' ? 'white' : '#64748B', fontWeight: 'bold'}}>Minha Conta</Text>
+                </Pressable>
+                <Pressable style={[styles.typeBtn, txCarteira === 'CONJUNTA' && styles.typeBtnActiveJoint]} onPress={() => setTxCarteira('CONJUNTA')}>
+                  <Text style={{color: txCarteira === 'CONJUNTA' ? 'white' : '#64748B', fontWeight: 'bold'}}>Conta Conjunta</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
 
           <Text style={styles.label}>Valor</Text>
           <TextInput style={styles.input} placeholder="Ex: 150" value={txValor} onChangeText={setTxValor} keyboardType="numeric" />
@@ -119,6 +140,8 @@ const styles = StyleSheet.create({
   typeBtn: { flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#F1F5F9' },
   typeBtnActiveDesp: { backgroundColor: '#EF4444' },
   typeBtnActiveRec: { backgroundColor: '#10B981' },
+  typeBtnActivePersonal: { backgroundColor: '#4F46E5' },
+  typeBtnActiveJoint: { backgroundColor: '#9333EA' },
   label: { fontSize: 13, fontWeight: '700', color: '#475569', marginBottom: 8, textTransform: 'uppercase' },
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, fontSize: 16, marginBottom: 20, color: '#0F172A' },
   actionRow: {flexDirection: 'row', gap: 12, marginTop: 10},

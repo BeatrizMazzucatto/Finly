@@ -25,7 +25,15 @@ export default function LoginScreen() {
 
   // Consider GUEST_USER (id_usuario: 1) as not logged in
   if (!loading && user && user.id_usuario !== 1) {
-    return <Redirect href="/(tabs)" />;
+    const hasCompletedOnboarding =
+      user.id_carteira_pessoal &&
+      (user.id_usuario === 1 || user.id_carteira_pessoal !== 1);
+
+    if (hasCompletedOnboarding) {
+      return <Redirect href="/(tabs)" />;
+    } else {
+      return <Redirect href="/onboarding" />;
+    }
   }
 
   async function handleLogin() {
@@ -37,13 +45,22 @@ export default function LoginScreen() {
     try {
       setSubmitting(true);
       setError(null);
-      await login(email.trim(), senha);
+      const loggedInUser = await login(email.trim(), senha);
 
-      const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
-      if (!onboardingDone) {
-        router.replace("/onboarding");
-      } else {
+      const hasCompletedOnboarding =
+        loggedInUser.id_carteira_pessoal &&
+        (loggedInUser.id_usuario === 1 || loggedInUser.id_carteira_pessoal !== 1);
+
+      if (hasCompletedOnboarding) {
+        await AsyncStorage.setItem(ONBOARDING_KEY, "true");
         router.replace("/(tabs)");
+      } else {
+        const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (!onboardingDone) {
+          router.replace("/onboarding");
+        } else {
+          router.replace("/(tabs)");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao entrar");

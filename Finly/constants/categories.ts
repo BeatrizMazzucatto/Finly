@@ -13,7 +13,7 @@ export interface Category {
 
 export const CATEGORIAS: Category[] = [
   { id: 1, nome: "Alimentação", icon: "coffee", cor: Colors.categories.alimentacao },
-  { id: 2, nome: "Mercado", icon: "shopping-cart", cor: Colors.categories.alimentacao },
+  { id: 2, nome: "Mercado", icon: "shopping-cart", cor: Colors.categories.mercado },
   { id: 3, nome: "Transporte", icon: "truck", cor: Colors.categories.transporte },
   { id: 4, nome: "Combustível", icon: "droplet", cor: Colors.categories.transporte },
   { id: 5, nome: "Saúde", icon: "heart", cor: Colors.categories.saude },

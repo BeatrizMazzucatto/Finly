@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Polyline, Rect, Stop, Text as SvgText } from "react-native-svg";
+import { PieChart, BarChart, LineChart } from "react-native-gifted-charts";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { getTransactionsByUser } from "@/src/services/transactions";
@@ -34,14 +34,9 @@ interface CategoryData { nome: string; total: number; percentual: number; cor: s
 
 // ─── Donut Chart ──────────────────────────────────────────────────────────────
 function DonutChart({ data, total, label }: { data: CategoryData[]; total: number; label: string }) {
-  const size = 200;
-  const stroke = 28;
-  const radius = (size - stroke) / 2;
-  const circ = 2 * Math.PI * radius;
-  let offset = 0;
-  const segments = data.slice(0, 8);
+  const [focusedCat, setFocusedCat] = useState<CategoryData | null>(null);
 
-  if (segments.length === 0) {
+  if (data.length === 0) {
     return (
       <View style={{ alignItems: "center", paddingVertical: 32 }}>
         <Feather name="pie-chart" size={48} color={Colors.textMuted} />
@@ -50,35 +45,51 @@ function DonutChart({ data, total, label }: { data: CategoryData[]; total: numbe
     );
   }
 
+  const pieData = data.slice(0, 8).map(cat => ({
+    value: cat.total,
+    color: cat.cor,
+    text: cat.nome,
+    focused: focusedCat?.nome === cat.nome,
+    onPress: () => {
+      if (focusedCat?.nome === cat.nome) {
+        setFocusedCat(null);
+      } else {
+        setFocusedCat(cat);
+      }
+    }
+  }));
+
   return (
-    <View style={{ alignItems: "center" }}>
-      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-        <Svg width={size} height={size}>
-          {segments.map((seg, i) => {
-            const dash = circ * (seg.percentual / 100);
-            const gap = circ - dash;
-            const el = (
-              <Circle
-                key={seg.nome}
-                cx={size / 2} cy={size / 2} r={radius}
-                stroke={seg.cor} strokeWidth={stroke} fill="none"
-                strokeDasharray={`${dash} ${gap}`}
-                strokeDashoffset={-offset}
-                rotation={-90} origin={`${size / 2},${size / 2}`}
-                strokeLinecap="butt"
-              />
+    <View style={{ alignItems: "center", paddingVertical: 10 }}>
+      <PieChart
+        data={pieData}
+        donut
+        focusOnPress
+        toggleFocusOnPress
+        radius={100}
+        innerRadius={70}
+        innerCircleColor={Colors.surface}
+        centerLabelComponent={() => {
+          if (focusedCat) {
+            return (
+              <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                <Text style={{fontSize: FontSize.xs, color: focusedCat.cor, fontWeight: 'bold'}}>{focusedCat.nome}</Text>
+                <Text style={{fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary}}>
+                  {formatCurrencyShort(focusedCat.total)}
+                </Text>
+              </View>
             );
-            offset += dash;
-            return el;
-          })}
-        </Svg>
-        <View style={{ position: "absolute", alignItems: "center" }}>
-          <Text style={{ fontSize: FontSize.xs, color: Colors.textMuted }}>{label}</Text>
-          <Text style={{ fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary }}>
-            {formatCurrencyShort(total)}
-          </Text>
-        </View>
-      </View>
+          }
+          return (
+            <View style={{justifyContent: 'center', alignItems: 'center'}}>
+              <Text style={{fontSize: FontSize.xs, color: Colors.textMuted}}>{label}</Text>
+              <Text style={{fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary}}>
+                {formatCurrencyShort(total)}
+              </Text>
+            </View>
+          );
+        }}
+      />
     </View>
   );
 }
@@ -91,35 +102,50 @@ function MonthlyBarChart({ transactions }: { transactions: Transaction[] }) {
     return { year: d.getFullYear(), month: d.getMonth(), label: MONTHS_PT[d.getMonth()] };
   });
 
-  const data = months.map(m => {
+  const barData: any[] = [];
+  months.forEach(m => {
     const txs = transactions.filter(t => {
       const d = new Date(`${t.data_transacao}T12:00:00`);
       return d.getFullYear() === m.year && d.getMonth() === m.month;
     });
     const receitas = txs.filter(t => t.tipo === "RECEITA").reduce((s, t) => s + Number(t.valor), 0);
     const despesas = txs.filter(t => t.tipo === "DESPESA").reduce((s, t) => s + Number(t.valor), 0);
-    return { ...m, receitas, despesas };
+    
+    barData.push({
+      value: receitas,
+      frontColor: Colors.income,
+      label: m.label,
+      spacing: 4,
+      labelWidth: 30,
+      labelTextStyle: {color: Colors.textMuted, fontSize: 10}
+    });
+    barData.push({
+      value: despesas,
+      frontColor: Colors.expense,
+      spacing: 16
+    });
   });
-
-  const maxVal = Math.max(...data.flatMap(d => [d.receitas, d.despesas]), 1);
-  const barH = 140;
-  const barW = (CHART_W - 32) / months.length / 2 - 4;
 
   return (
     <View>
       <Text style={s.chartSubtitle}>Últimos 6 meses</Text>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", height: barH + 24, gap: 2 }}>
-        {data.map((d, i) => (
-          <View key={i} style={{ flex: 1, alignItems: "center" }}>
-            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, height: barH }}>
-              <View style={{ width: barW, height: Math.max((d.receitas / maxVal) * barH, 3), backgroundColor: Colors.income, borderRadius: 4 }} />
-              <View style={{ width: barW, height: Math.max((d.despesas / maxVal) * barH, 3), backgroundColor: Colors.expense, borderRadius: 4 }} />
-            </View>
-            <Text style={{ fontSize: 9, color: Colors.textMuted, marginTop: 4 }}>{d.label}</Text>
-          </View>
-        ))}
+      <View style={{ marginTop: 20 }}>
+        <BarChart
+          data={barData}
+          barWidth={12}
+          spacing={16}
+          roundedTop
+          roundedBottom
+          hideRules
+          xAxisThickness={0}
+          yAxisThickness={0}
+          yAxisTextStyle={{color: Colors.textMuted, fontSize: 10}}
+          noOfSections={4}
+          maxValue={Math.max(...barData.map(d => d.value), 100)}
+          isAnimated
+        />
       </View>
-      <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+      <View style={{ flexDirection: "row", gap: 16, marginTop: 16, justifyContent: 'center' }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: Colors.income }} />
           <Text style={{ fontSize: FontSize.xs, color: Colors.textMuted }}>Receitas</Text>
@@ -143,14 +169,6 @@ function DailyLineChart({ transactions, year, month }: { transactions: Transacti
       .reduce((s, t) => s + Number(t.valor), 0);
   });
 
-  const maxVal = Math.max(...daily, 1);
-  const H = 100;
-  const W = CHART_W - 16;
-  const step = W / (daysInMonth - 1);
-
-  const points = daily.map((v, i) => `${i * step},${H - (v / maxVal) * H}`).join(" ");
-  const area = `M0,${H} ` + daily.map((v, i) => `L${i * step},${H - (v / maxVal) * H}`).join(" ") + ` L${(daysInMonth - 1) * step},${H} Z`;
-
   if (daily.every(v => v === 0)) {
     return (
       <View style={{ alignItems: "center", paddingVertical: 24 }}>
@@ -159,22 +177,36 @@ function DailyLineChart({ transactions, year, month }: { transactions: Transacti
     );
   }
 
+  const lineData = daily.map((val, i) => ({
+    value: val,
+    label: (i === 0 || i === Math.floor(daysInMonth / 2) || i === daysInMonth - 1) ? String(i + 1) : "",
+    dataPointText: val > 0 ? String(val) : ""
+  }));
+
   return (
     <View>
       <Text style={s.chartSubtitle}>Gastos por dia — {MONTHS_PT[month]}</Text>
-      <Svg width={W} height={H + 16} style={{ marginTop: 8 }}>
-        <Defs>
-          <LinearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={Colors.primary} stopOpacity="0.3" />
-            <Stop offset="1" stopColor={Colors.primary} stopOpacity="0.02" />
-          </LinearGradient>
-        </Defs>
-        <Path d={area} fill="url(#lineGrad)" />
-        <Polyline points={points} fill="none" stroke={Colors.primary} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {[0, Math.floor(daysInMonth / 2), daysInMonth - 1].map(i => (
-          <SvgText key={i} x={i * step} y={H + 14} fontSize="9" fill={Colors.textMuted} textAnchor="middle">{i + 1}</SvgText>
-        ))}
-      </Svg>
+      <View style={{ marginTop: 20 }}>
+        <LineChart
+          areaChart
+          data={lineData}
+          hideDataPoints
+          startFillColor={Colors.primary}
+          startOpacity={0.3}
+          endFillColor={Colors.primary}
+          endOpacity={0.02}
+          color={Colors.primary}
+          thickness={3}
+          xAxisThickness={0}
+          yAxisThickness={0}
+          yAxisTextStyle={{color: Colors.textMuted, fontSize: 10}}
+          xAxisLabelTextStyle={{color: Colors.textMuted, fontSize: 10}}
+          noOfSections={4}
+          maxValue={Math.max(...daily, 100)}
+          isAnimated
+          curved
+        />
+      </View>
     </View>
   );
 }
