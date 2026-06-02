@@ -21,6 +21,7 @@ import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/c
 import { Card, Chip, TransactionItem } from "@/components/ui";
 import { formatCurrency, getCurrentMonthYear } from "@/utils/formatters";
 import { CATEGORIAS } from "@/constants/categories";
+import { LineChart } from "react-native-gifted-charts";
 
 const FILTER_OPTIONS = ["Todos", "Receitas", "Despesas", "Conjuntas"];
 
@@ -36,22 +37,43 @@ export default function HistoryScreen() {
   const [showSearch, setShowSearch] = useState(false);
 
   const monthFilters = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    
     const months = [
       "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
       "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
     ];
-    const current = new Date();
-    const list = [];
-    for (let i = 0; i < 3; i++) {
-      const d = new Date(current.getFullYear(), current.getMonth() - i, 1);
-      list.push({
-        label: months[d.getMonth()],
-        month: d.getMonth(),
-        year: d.getFullYear(),
-      });
-    }
+    
+    const uniqueMonths = new Set<string>();
+    const list: {label: string, month: number, year: number}[] = [];
+    const currentYear = new Date().getFullYear();
+    
+    transactions.forEach(t => {
+      const parts = t.data_transacao.split("-");
+      if (parts.length >= 2) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // 0-indexed
+        const key = `${year}-${month}`;
+        
+        if (!uniqueMonths.has(key)) {
+          uniqueMonths.add(key);
+          list.push({
+            label: year === currentYear ? months[month] : `${months[month]} ${year}`,
+            month,
+            year
+          });
+        }
+      }
+    });
+    
+    // Sort descending (newest to oldest)
+    list.sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+    
     return list;
-  }, []);
+  }, [transactions]);
 
   const [activeMonthFilter, setActiveMonthFilter] = useState<{
     label: string;
@@ -158,6 +180,23 @@ export default function HistoryScreen() {
     () => filteredTransactions.filter((t) => t.tipo === "RECEITA").reduce((a, t) => a + Number(t.valor), 0),
     [filteredTransactions]
   );
+
+  const lineData = useMemo(() => {
+    const grouped = [...filteredTransactions]
+      .sort((a, b) => new Date(a.data_transacao).getTime() - new Date(b.data_transacao).getTime())
+      .reduce((acc, t) => {
+        const d = t.data_transacao;
+        const val = t.tipo === "DESPESA" ? Number(t.valor) : 0;
+        acc[d] = (acc[d] || 0) + val;
+        return acc;
+      }, {} as Record<string, number>);
+      
+    const data = Object.entries(grouped).map(([date, val]) => ({
+      value: val,
+      label: date.split("-")[2],
+    }));
+    return data.length > 0 ? data : [{value: 0}];
+  }, [filteredTransactions]);
 
   // Agrupar por data
   const groupedTransactions = useMemo(() => {
@@ -335,6 +374,33 @@ export default function HistoryScreen() {
           </Text>
         </View>
       </Card>
+
+      {/* Trend Chart */}
+      {lineData.length > 1 && activeFilter !== "Receitas" && (
+        <Card style={styles.summaryCard}>
+          <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>Tendência de Gastos</Text>
+          <View style={{ alignItems: 'center' }}>
+            <LineChart
+              data={lineData}
+              areaChart
+              hideDataPoints
+              startFillColor={Colors.expense}
+              startOpacity={0.3}
+              endFillColor={Colors.expense}
+              endOpacity={0.02}
+              color={Colors.expense}
+              thickness={2}
+              xAxisThickness={0}
+              yAxisThickness={0}
+              hideYAxisText
+              hideRules
+              curved
+              height={100}
+              width={250}
+            />
+          </View>
+        </Card>
+      )}
 
       {/* Sort Options */}
       <View style={styles.sortContainer}>

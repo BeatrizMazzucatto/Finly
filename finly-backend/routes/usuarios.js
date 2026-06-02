@@ -13,9 +13,10 @@ router.post("/login", (req, res) => {
   }
 
   const sql = `
-    SELECT u.id_usuario, u.nome, u.email, u.senha_hash, uc.id_carteira
+    SELECT u.id_usuario, u.nome, u.email, u.senha_hash,
+      (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'PESSOAL' LIMIT 1) as id_carteira_pessoal,
+      (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'CONJUNTA' LIMIT 1) as id_carteira_conjunta
     FROM usuarios u
-    LEFT JOIN usuarios_carteiras uc ON u.id_usuario = uc.id_usuario AND uc.papel = 'PROPRIETARIO'
     WHERE u.email = $1
     LIMIT 1
   `;
@@ -41,7 +42,8 @@ router.post("/login", (req, res) => {
       id_usuario: usuario.id_usuario,
       nome: usuario.nome,
       email: usuario.email,
-      id_carteira_pessoal: usuario.id_carteira || null,
+      id_carteira_pessoal: usuario.id_carteira_pessoal || null,
+      id_carteira_conjunta: usuario.id_carteira_conjunta || null,
     });
   });
 });

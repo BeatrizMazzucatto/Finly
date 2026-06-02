@@ -2,6 +2,8 @@ export interface User {
   id_usuario: number;
   nome: string;
   email: string;
+  id_carteira_pessoal?: number | null;
+  id_carteira_conjunta?: number | null;
 }
 
 export interface Transaction {

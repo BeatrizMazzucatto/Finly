@@ -17,9 +17,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/src/context/AuthContext";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
 import { formatMoneyInput } from "@/utils/formatters";
+import { CATEGORIAS } from "@/constants/categories";
+import { Card } from "@/components/ui";
 
 const LIMITE_KEY = "finly_limite_gastos";
-const RENDA_KEY = "finly_renda_mensal";
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
@@ -32,13 +33,11 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     async function loadSettings() {
-      const [limiteStored, rendaStored, customCatsStored] = await Promise.all([
+      const [limiteStored, customCatsStored] = await Promise.all([
         AsyncStorage.getItem(LIMITE_KEY),
-        AsyncStorage.getItem(RENDA_KEY),
         AsyncStorage.getItem("finly_custom_categories")
       ]);
       if (limiteStored) setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
-      if (rendaStored) setRenda(Number(rendaStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
       if (customCatsStored) setCustomCategories(JSON.parse(customCatsStored));
     }
     loadSettings();
@@ -77,9 +76,9 @@ export default function SettingsScreen() {
             await logout();
             router.replace("/login");
           },
-        ]
-      );
-    }
+        },
+      ]
+    );
   }
 
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.nome ?? "Lucas")}&background=4F46E5&color=fff`;
@@ -139,7 +138,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* Categorias */}
-      <Card style={styles.sectionCard}>
+      <Card style={styles.menuCard}>
         <Pressable style={styles.menuItem} onPress={() => setShowCategories(!showCategories)}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIcon, { backgroundColor: Colors.warning + "15" }]}>
@@ -215,7 +214,7 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </Pressable>
-      </View>
+      </Card>
     </ScrollView>
   );
 }
@@ -369,6 +368,23 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: Colors.textPrimary,
   },
+  menuItemTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+  menuItemSubtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  menuIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   menuDivider: {
     height: 1,
     backgroundColor: "#F1F5F9",
@@ -377,5 +393,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#10B981",
     fontWeight: "600",
+  },
+  editInput: {
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
+  },
+  saveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -259,7 +259,8 @@ export default function TransactionFormScreen() {
         {errors.valor && <Text style={styles.errorText}>{errors.valor}</Text>}
 
         {/* Context Selector: Pessoal vs Conjunto */}
-        <View style={styles.inputGroup}>
+        {!!user?.id_carteira_conjunta && (
+          <View style={styles.inputGroup}>
           <Text style={styles.label}>TIPO DE LANÇAMENTO</Text>
           <View style={{ gap: 10, marginBottom: 12 }}>
             {/* Option 1: Pessoal */}
@@ -333,6 +334,7 @@ export default function TransactionFormScreen() {
             </Pressable>
           </View>
         </View>
+        )}
 
         {/* Título */}
         <View style={styles.inputGroup}>
