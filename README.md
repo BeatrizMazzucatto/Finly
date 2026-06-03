@@ -315,6 +315,39 @@ npm run dev        # Inicia com nodemon (watch mode)
 
 ---
 
+## 👥 Autores
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/analayslla">
+        <img src="https://github.com/analayslla.png" width="100px;" alt="Ana Layslla"/><br>
+        <sub><b>Ana Layslla</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/annakitice">
+        <img src="https://github.com/annakitice.png" width="100px;" alt="Anna Kitice"/><br>
+        <sub><b>Anna Kitice</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/BeatrizMazzucatto">
+        <img src="https://github.com/BeatrizMazzucatto.png" width="100px;" alt="Beatriz Mazzucatto"/><br>
+        <sub><b>Beatriz Mazzucatto</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/juliagarciac">
+        <img src="https://github.com/juliagarciac.png" width="100px;" alt="Julia Garcia"/><br>
+        <sub><b>Julia Garcia</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## 🤝 Contribuindo
 
 Contribuições são muito bem-vindas!
