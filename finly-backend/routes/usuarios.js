@@ -1,11 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../database/connection");
+const bcrypt = require("bcrypt");
 
-
+const SALT_ROUNDS = 10;
 
 // POST /usuarios/login
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
   const { email, senha } = req.body;
 
   if (!email || !senha) {
@@ -21,11 +22,8 @@ router.post("/login", (req, res) => {
     LIMIT 1
   `;
 
-  db.query(sql, [email.trim().toLowerCase()], (err, result) => {
-    if (err) {
-      console.error("Erro ao autenticar:", err);
-      return res.status(500).json({ erro: "Erro ao autenticar usuário" });
-    }
+  try {
+    const result = await db.query(sql, [email.trim().toLowerCase()]);
 
     if (!result || result.rows.length === 0) {
       return res.status(401).json({ erro: "Credenciais inválidas" });
@@ -33,9 +31,13 @@ router.post("/login", (req, res) => {
 
     const usuario = result.rows[0];
 
-    // Comparação direta — substituir por bcrypt em produção
-    if (usuario.senha_hash !== senha) {
-      return res.status(401).json({ erro: "Credenciais inválidas" });
+    // Verificação segura com bcrypt
+    const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
+    if (!senhaValida) {
+      // Fallback: comparação direta para contas antigas ainda sem hash
+      if (usuario.senha_hash !== senha) {
+        return res.status(401).json({ erro: "Credenciais inválidas" });
+      }
     }
 
     return res.json({
@@ -45,11 +47,14 @@ router.post("/login", (req, res) => {
       id_carteira_pessoal: usuario.id_carteira_pessoal || null,
       id_carteira_conjunta: usuario.id_carteira_conjunta || null,
     });
-  });
+  } catch (err) {
+    console.error("Erro ao autenticar:", err);
+    return res.status(500).json({ erro: "Erro ao autenticar usuário" });
+  }
 });
 
 // POST /usuarios — Criar usuário
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const { nome, email, senha } = req.body;
 
   if (!nome || !email || !senha) {
@@ -61,7 +66,8 @@ router.post("/", (req, res) => {
     VALUES ($1, $2, $3) RETURNING id_usuario
   `;
 
-  db.query(sql, [nome, email.trim().toLowerCase(), senha], (err, result) => {
+  const senhaHashed = await bcrypt.hash(senha, SALT_ROUNDS);
+  db.query(sql, [nome, email.trim().toLowerCase(), senhaHashed], (err, result) => {
     if (err) {
       if (err.code === "ER_DUP_ENTRY" || err.code === "23505") { // 23505 is PostgreSQL unique constraint violation
         return res.status(409).json({ erro: "Email já cadastrado" });
