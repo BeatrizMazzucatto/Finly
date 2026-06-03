@@ -181,22 +181,66 @@ export default function HistoryScreen() {
     [filteredTransactions]
   );
 
-  const lineData = useMemo(() => {
-    const grouped = [...filteredTransactions]
+  const { lineData, lineData2 } = useMemo(() => {
+    const isTodos = activeFilter === "Todos";
+    const isReceita = activeFilter === "Receitas";
+
+    const grouped1: Record<string, number> = {};
+    const grouped2: Record<string, number> = {};
+
+    [...filteredTransactions]
       .sort((a, b) => new Date(a.data_transacao).getTime() - new Date(b.data_transacao).getTime())
-      .reduce((acc, t) => {
+      .forEach((t) => {
         const d = t.data_transacao;
-        const val = t.tipo === "DESPESA" ? Number(t.valor) : 0;
-        acc[d] = (acc[d] || 0) + val;
-        return acc;
-      }, {} as Record<string, number>);
-      
-    const data = Object.entries(grouped).map(([date, val]) => ({
+        if (isTodos) {
+          if (t.tipo === "DESPESA") grouped1[d] = (grouped1[d] || 0) + Number(t.valor);
+          if (t.tipo === "RECEITA") grouped2[d] = (grouped2[d] || 0) + Number(t.valor);
+        } else if (isReceita) {
+          if (t.tipo === "RECEITA") grouped1[d] = (grouped1[d] || 0) + Number(t.valor);
+        } else {
+          if (t.tipo === "DESPESA") grouped1[d] = (grouped1[d] || 0) + Number(t.valor);
+        }
+      });
+
+    const formatData = (grouped: Record<string, number>) => {
+      const entries = Object.entries(grouped).filter(([_, val]) => val > 0);
+      let data = entries.map(([date, val]) => ({
+        value: val,
+        label: date.split("-")[2],
+      }));
+      if (data.length === 0) return [];
+      if (data.length === 1) data = [{ value: 0, label: "" }, data[0]];
+      return data;
+    };
+
+    return {
+      lineData: formatData(grouped1),
+      lineData2: isTodos ? formatData(grouped2) : []
+    };
+  }, [filteredTransactions, activeFilter]);
+
+  const lineDataBalance = useMemo(() => {
+    if (activeFilter !== "Todos") return [];
+    
+    const grouped: Record<string, number> = {};
+    [...filteredTransactions]
+      .sort((a, b) => new Date(a.data_transacao).getTime() - new Date(b.data_transacao).getTime())
+      .forEach((t) => {
+        const d = t.data_transacao;
+        const val = t.tipo === "RECEITA" ? Number(t.valor) : -Number(t.valor);
+        grouped[d] = (grouped[d] || 0) + val;
+      });
+
+    const entries = Object.entries(grouped);
+    let data = entries.map(([date, val]) => ({
       value: val,
       label: date.split("-")[2],
     }));
-    return data.length > 0 ? data : [{value: 0}];
-  }, [filteredTransactions]);
+
+    if (data.length === 0) return [];
+    if (data.length === 1) data = [{ value: 0, label: "" }, data[0]];
+    return data;
+  }, [filteredTransactions, activeFilter]);
 
   // Agrupar por data
   const groupedTransactions = useMemo(() => {
@@ -376,19 +420,58 @@ export default function HistoryScreen() {
       </Card>
 
       {/* Trend Chart */}
-      {lineData.length > 1 && activeFilter !== "Receitas" && (
+      {(lineData.length > 0 || lineData2.length > 0) && (
         <Card style={styles.summaryCard}>
-          <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>Tendência de Gastos</Text>
+          <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>
+            {activeFilter === "Todos" ? "Receitas vs Gastos" : activeFilter === "Receitas" ? "Tendência de Receitas" : "Tendência de Gastos"}
+          </Text>
           <View style={{ alignItems: 'center' }}>
             <LineChart
-              data={lineData}
+              data={lineData.length > 0 ? lineData : [{value: 0}]}
+              {...(lineData2.length > 0 && activeFilter === "Todos" ? {
+                data2: lineData2,
+                color2: Colors.income,
+                startFillColor2: Colors.income,
+                endFillColor2: Colors.income,
+                startOpacity2: 0.3,
+                endOpacity2: 0.02,
+              } : {})}
               areaChart
               hideDataPoints
-              startFillColor={Colors.expense}
+              startFillColor={activeFilter === "Receitas" ? Colors.income : Colors.expense}
               startOpacity={0.3}
-              endFillColor={Colors.expense}
+              endFillColor={activeFilter === "Receitas" ? Colors.income : Colors.expense}
               endOpacity={0.02}
-              color={Colors.expense}
+              color={activeFilter === "Receitas" ? Colors.income : Colors.expense}
+              thickness={2}
+              xAxisThickness={0}
+              yAxisThickness={0}
+              hideYAxisText
+              hideRules
+              curved
+              height={100}
+              width={250}
+            />
+          </View>
+        </Card>
+      )}
+
+      {/* Net Balance Chart */}
+      {activeFilter === "Todos" && lineDataBalance.length > 0 && (
+        <Card style={styles.summaryCard}>
+          <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>
+            Saldo Diário (Receita - Despesa)
+          </Text>
+          <View style={{ alignItems: 'center' }}>
+            <LineChart
+              data={lineDataBalance}
+              areaChart
+              hideDataPoints
+              startFillColor={Colors.primary}
+              startOpacity={0.3}
+              endFillColor={Colors.primary}
+              endOpacity={0.02}
+              color={Colors.primary}
               thickness={2}
               xAxisThickness={0}
               yAxisThickness={0}

@@ -119,18 +119,12 @@ export default function TransactionFormScreen() {
 
   useEffect(() => {
     async function loadCategorias() {
-      try {
-        const data = await apiRequest<Categoria[]>("/categorias");
-        setCategorias(Array.isArray(data) ? data : []);
-      } catch {
-        setCategorias(CATEGORIAS.map((cat) => ({
-          id_categoria: cat.id,
-          nome: cat.nome,
-          cor_hex: cat.cor,
-        })));
-      } finally {
-        setLoadingCats(false);
-      }
+      setCategorias(CATEGORIAS.map((cat) => ({
+        id_categoria: cat.id,
+        nome: cat.nome,
+        cor_hex: cat.cor,
+      })));
+      setLoadingCats(false);
     }
     loadCategorias();
   }, []);
@@ -201,9 +195,7 @@ export default function TransactionFormScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.closeButton} onPress={dismiss}>
-          <Feather name="x" size={24} color={Colors.textPrimary} />
-        </Pressable>
+        <View style={styles.closeButton} />
         <Text style={styles.headerTitle}>
           {isEditing ? "Editar Transação" : "Nova Transação"}
         </Text>
@@ -375,7 +367,7 @@ export default function TransactionFormScreen() {
             <ActivityIndicator style={{ marginVertical: Spacing.lg }} />
           ) : (
             <View style={styles.categoriasGrid}>
-              {categorias.slice(0, 12).map((cat) => {
+              {categorias.map((cat) => {
                 const catInfo = CATEGORIAS.find((c) => c.nome === cat.nome);
                 const isSelected = idCategoria === cat.id_categoria;
                 return (

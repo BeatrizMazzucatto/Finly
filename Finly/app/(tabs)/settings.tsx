@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,8 @@ export default function SettingsScreen() {
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [showCategories, setShowCategories] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
 
   useEffect(() => {
     async function loadSettings() {
@@ -154,25 +156,83 @@ export default function SettingsScreen() {
 
         {showCategories && (
           <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginTop: 10, marginBottom: 10 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 10, color: Colors.textPrimary }}>Categorias Padrão</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+              {CATEGORIAS.map((c) => (
+                <View key={c.id} style={{ backgroundColor: c.cor + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Feather name={c.icon} size={12} color={c.cor} />
+                  <Text style={{ color: c.cor, fontWeight: '600', fontSize: 12 }}>{c.nome}</Text>
+                </View>
+              ))}
+            </View>
+
             <Text style={{ fontWeight: 'bold', marginBottom: 10, color: Colors.textPrimary }}>Minhas Categorias Customizadas</Text>
             {customCategories.length === 0 ? (
               <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 10 }}>Nenhuma categoria customizada criada ainda.</Text>
             ) : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
                 {customCategories.map((c, idx) => (
-                  <View key={idx} style={{ backgroundColor: Colors.primary + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                    <Text style={{ color: Colors.primary, fontWeight: '600', fontSize: 12 }}>{c}</Text>
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 8 }}>
+                    {editingCategory === c ? (
+                      <>
+                        <TextInput
+                          style={{ color: Colors.primary, fontWeight: '600', fontSize: 12, padding: 0, minWidth: 60 }}
+                          value={editingCategoryName}
+                          onChangeText={setEditingCategoryName}
+                          autoFocus
+                        />
+                        <Pressable onPress={async () => {
+                          if (editingCategoryName.trim() && editingCategoryName.trim() !== c) {
+                            const updated = customCategories.map(cat => cat === c ? editingCategoryName.trim() : cat);
+                            setCustomCategories(updated);
+                            await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
+                          }
+                          setEditingCategory(null);
+                        }}>
+                          <Feather name="check" size={14} color={Colors.success} />
+                        </Pressable>
+                        <Pressable onPress={() => setEditingCategory(null)}>
+                          <Feather name="x" size={14} color={Colors.error} />
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={{ color: Colors.primary, fontWeight: '600', fontSize: 12 }}>{c}</Text>
+                        <Pressable onPress={() => { setEditingCategory(c); setEditingCategoryName(c); }}>
+                          <Feather name="edit-2" size={12} color={Colors.primary} />
+                        </Pressable>
+                        <Pressable onPress={async () => {
+                          Alert.alert("Excluir", `Deseja excluir "${c}"?`, [
+                            { text: "Cancelar", style: "cancel" },
+                            {
+                              text: "Excluir", style: "destructive", onPress: async () => {
+                                const updated = customCategories.filter(cat => cat !== c);
+                                setCustomCategories(updated);
+                                await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
+                              }
+                            }
+                          ]);
+                          if (Platform.OS === 'web' && window.confirm(`Deseja excluir a categoria "${c}"?`)) {
+                            const updated = customCategories.filter(cat => cat !== c);
+                            setCustomCategories(updated);
+                            await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
+                          }
+                        }}>
+                          <Feather name="trash-2" size={12} color={Colors.error} />
+                        </Pressable>
+                      </>
+                    )}
                   </View>
                 ))}
               </View>
             )}
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TextInput 
-                style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]} 
-                placeholder="Nome da categoria..." 
-                value={newCategoryName} 
-                onChangeText={setNewCategoryName} 
+              <TextInput
+                style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]}
+                placeholder="Nome da categoria..."
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
               />
               <Pressable style={[styles.saveBtn, { paddingHorizontal: 20, height: 46 }]} onPress={handleAddCategory}>
                 <Feather name="plus" size={18} color="#fff" />

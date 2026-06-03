@@ -15,7 +15,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { format, parseISO } from "date-fns";
 import { Transaction } from "@/src/types/api";
 
-import { TransactionItem } from "@/components/TransactionItem";
+import { TransactionItem } from "@/components/ui/TransactionItem";
 import { CategoryCard } from "@/components/CategoryCard";
 import { TransactionModal, TransactionPayload } from "@/components/TransactionModal";
 import { getCategoryColor } from "@/constants/categories";
@@ -52,6 +52,7 @@ export default function DashboardScreen() {
   const [focusedCat, setFocusedCat] = useState<{name: string, value: number} | null>(null);
   
   const [periodFilter, setPeriodFilter] = useState<'month' | '3months' | 'year' | 'all'>('month');
+  const [chartType, setChartType] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
   const [walletFilter, setWalletFilter] = useState<'AMBAS' | 'PESSOAL' | 'CONJUNTA'>('AMBAS');
 
   useEffect(() => {
@@ -150,23 +151,27 @@ export default function DashboardScreen() {
     });
   }, [transactions, periodFilter]);
 
-  const { saldo, totalDespesas, expensesByCategory } = useMemo(() => {
+  const { saldo, totalDespesas, totalReceitas, expensesByCategory, incomesByCategory } = useMemo(() => {
     let s = 0;
     let d = 0;
-    let cats: Record<string, number> = {};
+    let r = 0;
+    let expCats: Record<string, number> = {};
+    let incCats: Record<string, number> = {};
 
     filteredTransactions.forEach(t => {
       const val = Number(t.valor);
+      const c = t.categoria || "Outros";
       if (t.tipo === "RECEITA") {
         s += val;
+        r += val;
+        incCats[c] = (incCats[c] || 0) + val;
       } else {
         s -= val;
         d += val;
-        const c = t.categoria || "Outros";
-        cats[c] = (cats[c] || 0) + val;
+        expCats[c] = (expCats[c] || 0) + val;
       }
     });
-    return { saldo: s, totalDespesas: d, expensesByCategory: cats };
+    return { saldo: s, totalDespesas: d, totalReceitas: r, expensesByCategory: expCats, incomesByCategory: incCats };
   }, [filteredTransactions]);
 
   return (
@@ -181,9 +186,6 @@ export default function DashboardScreen() {
             <Text style={{fontSize: 18, fontWeight: 'bold', color: '#0F172A'}}>{user?.nome}</Text>
           </View>
           <View style={{flexDirection: 'row', gap: 15, alignItems: 'center'}}>
-            <Pressable onPress={() => Alert.alert("Notificações", "Você não tem novas notificações no momento.")}>
-              <Feather name="bell" size={24} color="#0F172A" />
-            </Pressable>
             <Pressable onPress={async () => { await logout(); router.replace("/login"); }} style={styles.logoutBtn}>
               <Text style={{color: '#EF4444', fontWeight: 'bold'}}>Sair</Text>
             </Pressable>
@@ -217,51 +219,108 @@ export default function DashboardScreen() {
           <Chip label="Tudo" size="sm" selected={periodFilter === 'all'} onPress={() => setPeriodFilter('all')} />
         </View>
 
+        <View style={{flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20}}>
+          <Pressable onPress={() => {setChartType("DESPESA"); setFocusedCat(null);}} style={[{paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20}, chartType === "DESPESA" ? {backgroundColor: '#FEE2E2'} : {backgroundColor: 'transparent'}]}>
+            <Text style={{color: chartType === "DESPESA" ? '#EF4444' : '#64748B', fontWeight: 'bold'}}>Despesas</Text>
+          </Pressable>
+          <Pressable onPress={() => {setChartType("RECEITA"); setFocusedCat(null);}} style={[{paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20}, chartType === "RECEITA" ? {backgroundColor: '#D1FAE5'} : {backgroundColor: 'transparent'}]}>
+            <Text style={{color: chartType === "RECEITA" ? '#10B981' : '#64748B', fontWeight: 'bold'}}>Receitas</Text>
+          </Pressable>
+        </View>
+
         <View style={{ alignItems: 'center', marginBottom: 40 }}>
-          {Object.entries(expensesByCategory).length > 0 ? (
-            <PieChart
-              data={Object.entries(expensesByCategory).map(([cat, val]) => ({
-                value: val,
-                color: getCategoryColor(cat),
-                focused: focusedCat?.name === cat,
-                onPress: () => {
-                  if (focusedCat?.name === cat) {
-                    setFocusedCat(null);
-                  } else {
-                    setFocusedCat({ name: cat, value: val });
+          {chartType === "DESPESA" ? (
+            Object.entries(expensesByCategory).length > 0 ? (
+              <PieChart
+                data={Object.entries(expensesByCategory).map(([cat, val]) => ({
+                  value: val,
+                  color: getCategoryColor(cat),
+                  focused: focusedCat?.name === cat,
+                  onPress: () => {
+                    if (focusedCat?.name === cat) {
+                      setFocusedCat(null);
+                    } else {
+                      setFocusedCat({ name: cat, value: val });
+                    }
                   }
-                }
-              }))}
-              donut
-              focusOnPress
-              toggleFocusOnPress
-              radius={100}
-              innerRadius={70}
-              innerCircleColor={'#F8FAFC'}
-              centerLabelComponent={() => {
-                if (focusedCat) {
+                }))}
+                donut
+                focusOnPress
+                toggleFocusOnPress
+                radius={100}
+                innerRadius={70}
+                innerCircleColor={'#F8FAFC'}
+                centerLabelComponent={() => {
+                  if (focusedCat) {
+                    return (
+                      <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                        <Text style={{fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold'}}>{focusedCat.name}</Text>
+                        <Text style={{fontSize: 20, color: '#0F172A', fontWeight: 'bold'}}>{formatCurrency(focusedCat.value)}</Text>
+                      </View>
+                    );
+                  }
                   return (
                     <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                      <Text style={{fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold'}}>{focusedCat.name}</Text>
-                      <Text style={{fontSize: 20, color: '#0F172A', fontWeight: 'bold'}}>{formatCurrency(focusedCat.value)}</Text>
+                      <Text style={{fontSize: 12, color: '#64748B', fontWeight: 'bold'}}>Despesas</Text>
+                      <Text style={{fontSize: 20, color: '#EF4444', fontWeight: 'bold'}}>{formatCurrency(totalDespesas)}</Text>
                     </View>
                   );
-                }
-                return (
-                  <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                    <Text style={{fontSize: 12, color: '#64748B', fontWeight: 'bold'}}>Despesas</Text>
-                    <Text style={{fontSize: 20, color: '#0F172A', fontWeight: 'bold'}}>{formatCurrency(totalDespesas)}</Text>
-                  </View>
-                );
-              }}
-            />
-          ) : (
-            <View style={styles.ringContainer}>
-              <View style={styles.ringInner}>
-                <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Despesas</Text>
-                <Text style={{fontSize: 24, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(totalDespesas)}</Text>
+                }}
+              />
+            ) : (
+              <View style={styles.ringContainer}>
+                <View style={styles.ringInner}>
+                  <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Despesas</Text>
+                  <Text style={{fontSize: 24, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(totalDespesas)}</Text>
+                </View>
               </View>
-            </View>
+            )
+          ) : (
+            Object.entries(incomesByCategory).length > 0 ? (
+              <PieChart
+                data={Object.entries(incomesByCategory).map(([cat, val]) => ({
+                  value: val,
+                  color: getCategoryColor(cat),
+                  focused: focusedCat?.name === cat,
+                  onPress: () => {
+                    if (focusedCat?.name === cat) {
+                      setFocusedCat(null);
+                    } else {
+                      setFocusedCat({ name: cat, value: val });
+                    }
+                  }
+                }))}
+                donut
+                focusOnPress
+                toggleFocusOnPress
+                radius={100}
+                innerRadius={70}
+                innerCircleColor={'#F8FAFC'}
+                centerLabelComponent={() => {
+                  if (focusedCat) {
+                    return (
+                      <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                        <Text style={{fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold'}}>{focusedCat.name}</Text>
+                        <Text style={{fontSize: 20, color: '#0F172A', fontWeight: 'bold'}}>{formatCurrency(focusedCat.value)}</Text>
+                      </View>
+                    );
+                  }
+                  return (
+                    <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                      <Text style={{fontSize: 12, color: '#64748B', fontWeight: 'bold'}}>Receitas</Text>
+                      <Text style={{fontSize: 20, color: '#10B981', fontWeight: 'bold'}}>{formatCurrency(totalReceitas)}</Text>
+                    </View>
+                  );
+                }}
+              />
+            ) : (
+              <View style={styles.ringContainer}>
+                <View style={styles.ringInner}>
+                  <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Receitas</Text>
+                  <Text style={{fontSize: 24, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(totalReceitas)}</Text>
+                </View>
+              </View>
+            )
           )}
         </View>
 
@@ -290,9 +349,15 @@ export default function DashboardScreen() {
           transactions.slice(0, 5).map((t, idx) => (
             <TransactionItem 
               key={t.id_transacao || idx} 
-              transaction={t} 
-              formatCurrency={formatCurrency} 
-              formatDate={formatDate} 
+              id={t.id_transacao}
+              id_carteira={t.id_carteira}
+              usuario_nome={t.usuario_nome}
+              titulo={t.titulo}
+              valor={Number(t.valor)}
+              tipo={t.tipo}
+              categoria={t.categoria || "Outros"}
+              data={formatDate(t.data_transacao)}
+              style={{marginBottom: 12}}
             />
           ))
         )}
