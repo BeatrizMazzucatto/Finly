@@ -43,7 +43,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function DashboardScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   // Polling automático de 5s para sincronização entre dispositivos
   const { transactions, loading: loadingData, refresh } = useTransactionSync(user?.id_usuario);
@@ -66,19 +66,18 @@ export default function DashboardScreen() {
     if (!user) return;
     
     try {
-      const today = new Date().toISOString().split("T")[0]; // Still useful to send to API in this format, or let DB handle it.
+      const today = new Date().toISOString().split("T")[0];
       const id_carteira = payload.carteira === 'CONJUNTA' 
         ? (user.id_carteira_conjunta || 3) 
-        : (user.id_carteira_pessoal || 1); 
-      const catMap: any = { "Alimentação": 1, "Transporte": 5, "Saúde": 7, "Moradia": 3, "Salário": 17 };
-      
+        : (user.id_carteira_pessoal || 1);
+
       const res = await fetch(`${API_URL}/transacoes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id_carteira,
           id_usuario: user.id_usuario,
-          id_categoria: catMap[payload.categoria] || 1,
+          id_categoria: payload.id_categoria,
           titulo: payload.titulo,
           tipo: payload.tipo,
           valor: payload.valor,
@@ -166,11 +165,6 @@ export default function DashboardScreen() {
           <View>
             <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Olá, de novo!</Text>
             <Text style={{fontSize: 18, fontWeight: 'bold', color: '#0F172A'}}>{user?.nome}</Text>
-          </View>
-          <View style={{flexDirection: 'row', gap: 15, alignItems: 'center'}}>
-            <Pressable onPress={async () => { await logout(); router.replace("/login"); }} style={styles.logoutBtn}>
-              <Text style={{color: '#EF4444', fontWeight: 'bold'}}>Sair</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -307,13 +301,17 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Gastos por Categoria</Text>
+          <Text style={styles.sectionTitle}>
+            {chartType === 'DESPESA' ? 'Gastos por Categoria' : 'Receitas por Categoria'}
+          </Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 12, paddingBottom: 16}}>
-          {Object.entries(expensesByCategory).length === 0 ? (
-            <Text style={{color: '#64748B', paddingHorizontal: 16}}>Nenhum gasto registrado.</Text>
+          {Object.entries(chartType === 'DESPESA' ? expensesByCategory : incomesByCategory).length === 0 ? (
+            <Text style={{color: '#64748B', paddingHorizontal: 16}}>
+              {chartType === 'DESPESA' ? 'Nenhum gasto registrado.' : 'Nenhuma receita registrada.'}
+            </Text>
           ) : (
-            Object.entries(expensesByCategory).map(([cat, val]) => (
+            Object.entries(chartType === 'DESPESA' ? expensesByCategory : incomesByCategory).map(([cat, val]) => (
               <CategoryCard key={cat} category={cat} value={val} formatCurrency={formatCurrency} />
             ))
           )}

@@ -18,9 +18,9 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/src/context/AuthContext";
 import { apiRequest } from "@/src/services/api";
+import { getCategories } from "@/src/services/categories";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
-import { CATEGORIAS } from "@/constants/categories";
 import { formatMoneyInput, parseMoneyInput } from "@/utils/formatters";
 
 const CARTEIRA_KEY = "finly_id_carteira";
@@ -29,6 +29,7 @@ interface Categoria {
   id_categoria: number;
   nome: string;
   cor_hex: string;
+  icone: string;
 }
 
 function showAlert(title: string, message: string) {
@@ -119,11 +120,12 @@ export default function TransactionFormScreen() {
 
   useEffect(() => {
     async function loadCategorias() {
-      setCategorias(CATEGORIAS.map((cat) => ({
-        id_categoria: cat.id,
-        nome: cat.nome,
-        cor_hex: cat.cor,
-      })));
+      try {
+        const loaded = await getCategories();
+        setCategorias(loaded);
+      } catch {
+        setCategorias([]);
+      }
       setLoadingCats(false);
     }
     loadCategorias();
@@ -184,7 +186,7 @@ export default function TransactionFormScreen() {
   }
 
   const selectedCategory = categorias.find((c) => c.id_categoria === idCategoria);
-  const categoryIcon = CATEGORIAS.find((c) => c.nome === selectedCategory?.nome)?.icon || "tag";
+  const categoryIcon = selectedCategory?.icone || "tag";
 
   return (
     <KeyboardAvoidingView
@@ -368,7 +370,6 @@ export default function TransactionFormScreen() {
           ) : (
             <View style={styles.categoriasGrid}>
               {categorias.map((cat) => {
-                const catInfo = CATEGORIAS.find((c) => c.nome === cat.nome);
                 const isSelected = idCategoria === cat.id_categoria;
                 return (
                   <Pressable
@@ -376,25 +377,25 @@ export default function TransactionFormScreen() {
                     style={[
                       styles.categoriaItem,
                       isSelected && { 
-                        backgroundColor: (catInfo?.cor || cat.cor_hex) + "20",
-                        borderColor: catInfo?.cor || cat.cor_hex,
+                        backgroundColor: cat.cor_hex + "20",
+                        borderColor: cat.cor_hex,
                       },
                     ]}
                     onPress={() => setIdCategoria(cat.id_categoria)}
                   >
                     <View style={[
                       styles.categoriaIcon,
-                      { backgroundColor: (catInfo?.cor || cat.cor_hex) + "20" },
+                      { backgroundColor: cat.cor_hex + "20" },
                     ]}>
                       <Feather 
-                        name={catInfo?.icon || "tag"} 
+                        name={cat.icone as any} 
                         size={18} 
-                        color={catInfo?.cor || cat.cor_hex} 
+                        color={cat.cor_hex} 
                       />
                     </View>
                     <Text style={[
                       styles.categoriaText,
-                      isSelected && { color: catInfo?.cor || cat.cor_hex, fontWeight: FontWeight.semibold },
+                      isSelected && { color: cat.cor_hex, fontWeight: FontWeight.semibold },
                     ]} numberOfLines={1}>
                       {cat.nome}
                     </Text>

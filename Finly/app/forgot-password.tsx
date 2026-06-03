@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Redirect, router } from "expo-router";
 import { useState } from "react";
+import { Redirect, router } from "expo-router";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,60 +9,37 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
 } from "react-native";
-
 import { useAuth } from "@/src/context/AuthContext";
 
-const ONBOARDING_KEY = "finly_onboarding_done";
-
-export default function LoginScreen() {
-  const { user, loading, login } = useAuth();
+export default function ForgotPasswordScreen() {
+  const { user, loading } = useAuth();
   const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Consider GUEST_USER (id_usuario: 1) as not logged in
   if (!loading && user && user.id_usuario !== 1) {
-    const hasCompletedOnboarding =
-      user.id_carteira_pessoal &&
-      (user.id_usuario === 1 || user.id_carteira_pessoal !== 1);
-
-    if (hasCompletedOnboarding) {
-      return <Redirect href="/(tabs)" />;
-    } else {
-      return <Redirect href="/onboarding" />;
-    }
+    return <Redirect href="/(tabs)" />;
   }
 
-  async function handleLogin() {
-    if (!email.trim() || !senha.trim()) {
-      setError("Preencha email e senha.");
+  async function handleSubmit() {
+    if (!email.trim()) {
+      setError("Digite um email válido.");
       return;
     }
 
+    setSubmitting(true);
+    setError(null);
     try {
-      setSubmitting(true);
-      setError(null);
-      const loggedInUser = await login(email.trim(), senha);
-
-      const hasCompletedOnboarding =
-        loggedInUser.id_carteira_pessoal &&
-        (loggedInUser.id_usuario === 1 || loggedInUser.id_carteira_pessoal !== 1);
-
-      if (hasCompletedOnboarding) {
-        await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-        router.replace("/(tabs)");
-      } else {
-        const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
-        if (!onboardingDone) {
-          router.replace("/onboarding");
-        } else {
-          router.replace("/(tabs)");
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao entrar");
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      Alert.alert(
+        "Verificação enviada",
+        "Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.",
+        [{ text: "OK", onPress: () => router.replace("/login") }]
+      );
+    } catch {
+      setError("Falha ao processar a solicitação.");
     } finally {
       setSubmitting(false);
     }
@@ -75,10 +51,8 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Finly</Text>
-        <Text style={styles.subtitle}>
-          Controle financeiro conectado ao seu backend.
-        </Text>
+        <Text style={styles.title}>Esqueci minha senha</Text>
+        <Text style={styles.subtitle}>Informe seu email e receba orientações para redefinir a senha.</Text>
 
         <TextInput
           autoCapitalize="none"
@@ -88,34 +62,20 @@ export default function LoginScreen() {
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          placeholder="Senha"
-          secureTextEntry
-          style={styles.input}
-          value={senha}
-          onChangeText={setSenha}
-        />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Pressable
           style={[styles.button, submitting && styles.buttonDisabled]}
           disabled={submitting}
-          onPress={handleLogin}
+          onPress={handleSubmit}
         >
-          {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Entrar</Text>
-          )}
+          {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Enviar</Text>}
         </Pressable>
 
         <View style={styles.linkRow}>
-          <Pressable onPress={() => router.push('/forgot-password')}>
-            <Text style={styles.linkText}>Esqueceu a senha?</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/register')}>
-            <Text style={styles.linkText}>Criar conta</Text>
+          <Pressable onPress={() => router.replace("/login")}> 
+            <Text style={styles.linkText}>Voltar ao login</Text>
           </Pressable>
         </View>
       </View>
@@ -186,8 +146,7 @@ const styles = StyleSheet.create({
   },
   linkRow: {
     marginTop: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
   },
   linkText: {
     color: "#2563EB",

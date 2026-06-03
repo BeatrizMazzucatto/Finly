@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, Alert } from 'react-native';
 import { Feather } from "@expo/vector-icons";
+import { getCategories, Category } from "@/src/services/categories";
 
 export type TransactionPayload = {
   titulo: string;
   tipo: "RECEITA" | "DESPESA";
   valor: number;
   categoria: string;
+  id_categoria: number;
   carteira: "PESSOAL" | "CONJUNTA";
 };
 
@@ -21,11 +23,35 @@ export function TransactionModal({ visible, onClose, onSave, hasJointWallet = fa
   const [txTipo, setTxTipo] = useState<"RECEITA" | "DESPESA">("DESPESA");
   const [txValor, setTxValor] = useState("");
   const [txTitulo, setTxTitulo] = useState("");
-  const [txCategoria, setTxCategoria] = useState("Alimentação");
   const [txCarteira, setTxCarteira] = useState<"PESSOAL" | "CONJUNTA">("PESSOAL");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   // Reseta os campos toda vez que o modal é fechado
   useEffect(() => {
+    if (!visible) {
+      setTxValor("");
+      setTxTitulo("");
+      setTxTipo("DESPESA");
+      setTxCarteira("PESSOAL");
+      setSelectedCategoryId(null);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const loaded = await getCategories();
+        setCategories(loaded);
+        if (loaded.length > 0) {
+          setSelectedCategoryId(loaded[0].id_categoria);
+        }
+      } catch {
+        setCategories([]);
+      }
+    }
+    if (visible) loadCategories();
+  }, [visible]);
     if (!visible) {
       setTxValor("");
       setTxTitulo("");
@@ -46,28 +72,33 @@ export function TransactionModal({ visible, onClose, onSave, hasJointWallet = fa
   };
 
   const handleSave = async () => {
-    if (!txValor || !txTitulo) {
-      Alert.alert("Erro", "Preencha valor e título");
+    if (!txValor || !txTitulo || !selectedCategoryId) {
+      Alert.alert("Erro", "Preencha valor, título e categoria");
       return;
     }
+
+    const selectedCategory = categories.find((category) => category.id_categoria === selectedCategoryId);
 
     try {
       await onSave({
         titulo: txTitulo,
         tipo: txTipo,
         valor: Number(txValor),
-        categoria: txCategoria,
-        carteira: txCarteira
+        categoria: selectedCategory?.nome ?? "Outros",
+        id_categoria: selectedCategoryId,
+        carteira: txCarteira,
       });
 
       // Reset state after successful save
       setTxValor("");
       setTxTitulo("");
       setTxTipo("DESPESA");
-      setTxCategoria("Alimentação");
       setTxCarteira("PESSOAL");
+      if (categories.length > 0) {
+        setSelectedCategoryId(categories[0].id_categoria);
+      }
     } catch (err) {
-        // Error handling is managed by the parent, but we won't reset state if it fails
+      // Error handling is managed by the parent, but we won't reset state if it fails
     }
   };
 
@@ -113,8 +144,24 @@ export function TransactionModal({ visible, onClose, onSave, hasJointWallet = fa
           <Text style={styles.label}>Título da Transação</Text>
           <TextInput style={styles.input} placeholder="Ex: Supermercado" value={txTitulo} onChangeText={setTxTitulo} />
 
-          <Text style={styles.label}>Categoria (Ex: Alimentação, Transporte...)</Text>
-          <TextInput style={styles.input} placeholder="Categoria" value={txCategoria} onChangeText={setTxCategoria} />
+          <Text style={styles.label}>Categoria</Text>
+          <View style={styles.categoryGrid}>
+            {categories.map((category) => {
+              const selected = selectedCategoryId === category.id_categoria;
+              return (
+                <Pressable
+                  key={category.id_categoria}
+                  style={[styles.categoryPill, selected && styles.categoryPillSelected]}
+                  onPress={() => setSelectedCategoryId(category.id_categoria)}
+                >
+                  <Feather name={category.icone as any} size={18} color={selected ? '#fff' : category.cor_hex} />
+                  <Text style={[styles.categoryPillText, selected && { color: '#fff' }]} numberOfLines={1}>
+                    {category.nome}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <View style={styles.actionRow}>
             <Pressable style={[styles.btnMain, styles.btnCancel]} onPress={handleClose}>
@@ -147,5 +194,29 @@ const styles = StyleSheet.create({
   actionRow: {flexDirection: 'row', gap: 12, marginTop: 10},
   btnMain: { flex: 1, backgroundColor: '#4F46E5', padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   btnCancel: { backgroundColor: '#F1F5F9' },
-  btnMainText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
+  btnMainText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 },
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 100,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  categoryPillSelected: {
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
+  },
+  categoryPillText: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '600',
+    flexShrink: 1,
+  },
 });

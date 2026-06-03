@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Redirect, router } from "expo-router";
 import { useState } from "react";
 import {
@@ -10,60 +9,46 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
 } from "react-native";
-
 import { useAuth } from "@/src/context/AuthContext";
+import { apiRequest } from "@/src/services/api";
 
-const ONBOARDING_KEY = "finly_onboarding_done";
-
-export default function LoginScreen() {
-  const { user, loading, login } = useAuth();
+export default function RegisterScreen() {
+  const { user, loading } = useAuth();
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmSenha, setConfirmSenha] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Consider GUEST_USER (id_usuario: 1) as not logged in
   if (!loading && user && user.id_usuario !== 1) {
-    const hasCompletedOnboarding =
-      user.id_carteira_pessoal &&
-      (user.id_usuario === 1 || user.id_carteira_pessoal !== 1);
-
-    if (hasCompletedOnboarding) {
-      return <Redirect href="/(tabs)" />;
-    } else {
-      return <Redirect href="/onboarding" />;
-    }
+    return <Redirect href="/(tabs)" />;
   }
 
-  async function handleLogin() {
-    if (!email.trim() || !senha.trim()) {
-      setError("Preencha email e senha.");
+  async function handleRegister() {
+    if (!nome.trim() || !email.trim() || !senha.trim() || !confirmSenha.trim()) {
+      setError("Preencha todos os campos.");
+      return;
+    }
+    if (senha !== confirmSenha) {
+      setError("As senhas não coincidem.");
       return;
     }
 
     try {
       setSubmitting(true);
       setError(null);
-      const loggedInUser = await login(email.trim(), senha);
-
-      const hasCompletedOnboarding =
-        loggedInUser.id_carteira_pessoal &&
-        (loggedInUser.id_usuario === 1 || loggedInUser.id_carteira_pessoal !== 1);
-
-      if (hasCompletedOnboarding) {
-        await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-        router.replace("/(tabs)");
-      } else {
-        const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
-        if (!onboardingDone) {
-          router.replace("/onboarding");
-        } else {
-          router.replace("/(tabs)");
-        }
-      }
+      await apiRequest<{ mensagem: string }>("/usuarios", {
+        method: "POST",
+        body: JSON.stringify({ nome: nome.trim(), email: email.trim(), senha }),
+      });
+      Alert.alert("Sucesso", "Conta criada com sucesso. Faça login.", [
+        { text: "OK", onPress: () => router.replace("/login") },
+      ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao entrar");
+      setError(err instanceof Error ? err.message : "Falha ao criar conta.");
     } finally {
       setSubmitting(false);
     }
@@ -75,11 +60,16 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Finly</Text>
-        <Text style={styles.subtitle}>
-          Controle financeiro conectado ao seu backend.
-        </Text>
+        <Text style={styles.title}>Criar Conta</Text>
+        <Text style={styles.subtitle}>Abra seu acesso e comece a organizar suas finanças.</Text>
 
+        <TextInput
+          autoCapitalize="words"
+          placeholder="Nome"
+          style={styles.input}
+          value={nome}
+          onChangeText={setNome}
+        />
         <TextInput
           autoCapitalize="none"
           keyboardType="email-address"
@@ -95,27 +85,27 @@ export default function LoginScreen() {
           value={senha}
           onChangeText={setSenha}
         />
+        <TextInput
+          placeholder="Confirme a senha"
+          secureTextEntry
+          style={styles.input}
+          value={confirmSenha}
+          onChangeText={setConfirmSenha}
+        />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Pressable
           style={[styles.button, submitting && styles.buttonDisabled]}
           disabled={submitting}
-          onPress={handleLogin}
+          onPress={handleRegister}
         >
-          {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Entrar</Text>
-          )}
+          {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Criar Conta</Text>}
         </Pressable>
 
         <View style={styles.linkRow}>
-          <Pressable onPress={() => router.push('/forgot-password')}>
-            <Text style={styles.linkText}>Esqueceu a senha?</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/register')}>
-            <Text style={styles.linkText}>Criar conta</Text>
+          <Pressable onPress={() => router.replace("/login")}> 
+            <Text style={styles.linkText}>Voltar ao login</Text>
           </Pressable>
         </View>
       </View>
@@ -186,8 +176,7 @@ const styles = StyleSheet.create({
   },
   linkRow: {
     marginTop: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
   },
   linkText: {
     color: "#2563EB",
