@@ -348,18 +348,6 @@ npm run dev        # Inicia com nodemon (watch mode)
 
 ---
 
-## 🤝 Contribuindo
-
-Contribuições são muito bem-vindas!
-
-1. 🍴 Fork o projeto
-2. 🌿 Crie uma branch (`git checkout -b feature/NovaFuncionalidade`)
-3. 💾 Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. 📤 Push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. 🔃 Abra um Pull Request
-
----
-
 <div align="center">
 
 ⭐ **Se este projeto foi útil, considere dar uma estrela!** ⭐
