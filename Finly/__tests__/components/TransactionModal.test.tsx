@@ -56,13 +56,11 @@ describe('TransactionModal', () => {
 
   it('exibe alerta de erro ao tentar salvar sem campos preenchidos', async () => {
     const { getByText } = renderModal();
-    
-    // Tenta salvar sem preencher
+
     await act(async () => {
       fireEvent.press(getByText('Salvar'));
     });
-    
-    // onSave NÃO deve ser chamado pois a validação falha
+
     expect(mockOnSave).not.toHaveBeenCalled();
   });
 
@@ -81,14 +79,15 @@ describe('TransactionModal', () => {
       tipo: 'DESPESA',
       valor: 100,
       categoria: 'Alimentação',
+      carteira: 'PESSOAL',
     });
   });
 
   it('muda tipo para Receita ao pressionar botão Receita', () => {
     const { getByText } = renderModal();
+
     fireEvent.press(getByText('Receita'));
-    // O botão Receita deve estar selecionado (estado muda visualmente)
-    // Verificamos que o elemento existe e pode ser pressionado
+
     expect(getByText('Receita')).toBeTruthy();
   });
 });

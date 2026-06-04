@@ -28,16 +28,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function restoreSession() {
-      try {
-        const cachedUser = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-        if (cachedUser) {
-          setUser(JSON.parse(cachedUser) as User);
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
+  try {
+    const cachedUser = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
 
+    if (cachedUser) {
+      setUser(JSON.parse(cachedUser) as User);
+    }
+  } catch (error) {
+    console.error("Erro ao restaurar sessão:", error);
+  } finally {
+    setLoading(false);
+  }
+}
     restoreSession();
   }, []);
 
