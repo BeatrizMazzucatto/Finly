@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/src/context/AuthContext";
 import { format, parseISO } from "date-fns";
 import { Transaction } from "@/src/types/api";
+import { useTransactionSync } from "@/src/services/transactions";
 
 import { TransactionItem } from "@/components/ui/TransactionItem";
 import { CategoryCard } from "@/components/CategoryCard";
@@ -42,10 +43,10 @@ function formatDate(dateStr: string) {
 }
 
 export default function DashboardScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
+  // Polling automático de 5s para sincronização entre dispositivos
+  const { transactions, loading: loadingData, refresh } = useTransactionSync(user?.id_usuario);
   const [refreshing, setRefreshing] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -55,48 +56,28 @@ export default function DashboardScreen() {
   const [chartType, setChartType] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
   const [walletFilter, setWalletFilter] = useState<'AMBAS' | 'PESSOAL' | 'CONJUNTA'>('AMBAS');
 
-  useEffect(() => {
-    if (user?.id_usuario) {
-      loadDashboardData(user.id_usuario);
-    }
-  }, [user?.id_usuario]);
-
-  async function loadDashboardData(id: number, isRefresh = false) {
-    if (isRefresh) setRefreshing(true);
-    else setLoadingData(true);
-    
-    try {
-      const res = await fetch(`${API_URL}/transacoes/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) setTransactions(data);
-        else setTransactions([]);
-      }
-    } catch (err) {
-      Alert.alert("Erro", "Falha ao carregar transações");
-    } finally {
-      setLoadingData(false);
-      setRefreshing(false);
-    }
+  async function handleRefresh() {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
   }
 
   async function createTransaction(payload: TransactionPayload) {
     if (!user) return;
     
     try {
-      const today = new Date().toISOString().split("T")[0]; // Still useful to send to API in this format, or let DB handle it.
+      const today = new Date().toISOString().split("T")[0];
       const id_carteira = payload.carteira === 'CONJUNTA' 
         ? (user.id_carteira_conjunta || 3) 
-        : (user.id_carteira_pessoal || 1); 
-      const catMap: any = { "Alimentação": 1, "Transporte": 5, "Saúde": 7, "Moradia": 3, "Salário": 17 };
-      
+        : (user.id_carteira_pessoal || 1);
+
       const res = await fetch(`${API_URL}/transacoes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id_carteira,
           id_usuario: user.id_usuario,
-          id_categoria: catMap[payload.categoria] || 1,
+          id_categoria: payload.id_categoria,
           titulo: payload.titulo,
           tipo: payload.tipo,
           valor: payload.valor,
@@ -107,7 +88,7 @@ export default function DashboardScreen() {
       if (!res.ok) throw new Error("Erro ao salvar");
       setModalVisible(false);
       Alert.alert("Sucesso", "Transação salva com sucesso!");
-      loadDashboardData(user.id_usuario);
+      refresh();
     } catch (err: any) {
       Alert.alert("Erro", err.message);
       throw err; // throw to prevent modal from closing and clearing state
@@ -178,17 +159,12 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {if(user) loadDashboardData(user.id_usuario, true)}} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         <View style={styles.dashHeader}>
           <View>
             <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Olá, de novo!</Text>
             <Text style={{fontSize: 18, fontWeight: 'bold', color: '#0F172A'}}>{user?.nome}</Text>
-          </View>
-          <View style={{flexDirection: 'row', gap: 15, alignItems: 'center'}}>
-            <Pressable onPress={async () => { await logout(); router.replace("/login"); }} style={styles.logoutBtn}>
-              <Text style={{color: '#EF4444', fontWeight: 'bold'}}>Sair</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -325,13 +301,17 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Gastos por Categoria</Text>
+          <Text style={styles.sectionTitle}>
+            {chartType === 'DESPESA' ? 'Gastos por Categoria' : 'Receitas por Categoria'}
+          </Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 12, paddingBottom: 16}}>
-          {Object.entries(expensesByCategory).length === 0 ? (
-            <Text style={{color: '#64748B', paddingHorizontal: 16}}>Nenhum gasto registrado.</Text>
+          {Object.entries(chartType === 'DESPESA' ? expensesByCategory : incomesByCategory).length === 0 ? (
+            <Text style={{color: '#64748B', paddingHorizontal: 16}}>
+              {chartType === 'DESPESA' ? 'Nenhum gasto registrado.' : 'Nenhuma receita registrada.'}
+            </Text>
           ) : (
-            Object.entries(expensesByCategory).map(([cat, val]) => (
+            Object.entries(chartType === 'DESPESA' ? expensesByCategory : incomesByCategory).map(([cat, val]) => (
               <CategoryCard key={cat} category={cat} value={val} formatCurrency={formatCurrency} />
             ))
           )}

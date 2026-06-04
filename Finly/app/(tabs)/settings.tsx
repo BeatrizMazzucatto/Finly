@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -15,9 +16,9 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/src/context/AuthContext";
+import { getCategories, createCategory } from "@/src/services/categories";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
 import { formatMoneyInput } from "@/utils/formatters";
-import { CATEGORIAS } from "@/constants/categories";
 import { Card } from "@/components/ui";
 
 const LIMITE_KEY = "finly_limite_gastos";
@@ -27,31 +28,47 @@ export default function SettingsScreen() {
   const [limite, setLimite] = useState("3.000,00");
   const [editingLimite, setEditingLimite] = useState(false);
 
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{
+    id_categoria: number;
+    nome: string;
+    cor_hex: string;
+    icone: string;
+  }[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryIcon, setNewCategoryIcon] = useState<keyof typeof Feather.glyphMap>("tag");
   const [showCategories, setShowCategories] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   useEffect(() => {
     async function loadSettings() {
-      const [limiteStored, customCatsStored] = await Promise.all([
-        AsyncStorage.getItem(LIMITE_KEY),
-        AsyncStorage.getItem("finly_custom_categories")
-      ]);
+      const limiteStored = await AsyncStorage.getItem(LIMITE_KEY);
       if (limiteStored) setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
-      if (customCatsStored) setCustomCategories(JSON.parse(customCatsStored));
+
+      const loadedCategories = await getCategories().catch(() => []);
+      setCategories(loadedCategories);
+      setLoadingCategories(false);
     }
     loadSettings();
   }, []);
 
   async function handleAddCategory() {
-    if (!newCategoryName.trim()) return;
-    const updated = [...customCategories, newCategoryName.trim()];
-    setCustomCategories(updated);
-    setNewCategoryName("");
-    await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
-    Alert.alert("Sucesso", "Categoria criada!");
+    if (!newCategoryName.trim()) {
+      Alert.alert("Erro", "Digite o nome da categoria.");
+      return;
+    }
+
+    try {
+      const created = await createCategory({
+        nome: newCategoryName.trim(),
+        icone: newCategoryIcon,
+        cor_hex: Colors.categories.outros,
+      });
+      setCategories((prev) => [...prev, created]);
+      setNewCategoryName("");
+      Alert.alert("Sucesso", "Categoria criada!");
+    } catch (err) {
+      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível criar a categoria.");
+    }
   }
 
   async function handleSaveLimite() {
@@ -156,78 +173,60 @@ export default function SettingsScreen() {
 
         {showCategories && (
           <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginTop: 10, marginBottom: 10 }}>
-            <Text style={{ fontWeight: 'bold', marginBottom: 10, color: Colors.textPrimary }}>Categorias Padrão</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <View>
+                <Text style={{ fontWeight: 'bold', marginBottom: 4, color: Colors.textPrimary }}>Categorias Disponíveis</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{categories.length} categorias configuradas</Text>
+              </View>
+              {loadingCategories ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
+            </View>
+
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-              {CATEGORIAS.map((c) => (
-                <View key={c.id} style={{ backgroundColor: c.cor + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Feather name={c.icon} size={12} color={c.cor} />
-                  <Text style={{ color: c.cor, fontWeight: '600', fontSize: 12 }}>{c.nome}</Text>
+              {categories.map((c) => (
+                <View key={c.id_categoria} style={{ backgroundColor: c.cor_hex + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Feather name={c.icone as any} size={12} color={c.cor_hex} />
+                  <Text style={{ color: c.cor_hex, fontWeight: '600', fontSize: 12 }}>{c.nome}</Text>
                 </View>
               ))}
             </View>
 
-            <Text style={{ fontWeight: 'bold', marginBottom: 10, color: Colors.textPrimary }}>Minhas Categorias Customizadas</Text>
-            {customCategories.length === 0 ? (
-              <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 10 }}>Nenhuma categoria customizada criada ainda.</Text>
-            ) : (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
-                {customCategories.map((c, idx) => (
-                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 8 }}>
-                    {editingCategory === c ? (
-                      <>
-                        <TextInput
-                          style={{ color: Colors.primary, fontWeight: '600', fontSize: 12, padding: 0, minWidth: 60 }}
-                          value={editingCategoryName}
-                          onChangeText={setEditingCategoryName}
-                          autoFocus
-                        />
-                        <Pressable onPress={async () => {
-                          if (editingCategoryName.trim() && editingCategoryName.trim() !== c) {
-                            const updated = customCategories.map(cat => cat === c ? editingCategoryName.trim() : cat);
-                            setCustomCategories(updated);
-                            await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
-                          }
-                          setEditingCategory(null);
-                        }}>
-                          <Feather name="check" size={14} color={Colors.success} />
-                        </Pressable>
-                        <Pressable onPress={() => setEditingCategory(null)}>
-                          <Feather name="x" size={14} color={Colors.error} />
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={{ color: Colors.primary, fontWeight: '600', fontSize: 12 }}>{c}</Text>
-                        <Pressable onPress={() => { setEditingCategory(c); setEditingCategoryName(c); }}>
-                          <Feather name="edit-2" size={12} color={Colors.primary} />
-                        </Pressable>
-                        <Pressable onPress={async () => {
-                          Alert.alert("Excluir", `Deseja excluir "${c}"?`, [
-                            { text: "Cancelar", style: "cancel" },
-                            {
-                              text: "Excluir", style: "destructive", onPress: async () => {
-                                const updated = customCategories.filter(cat => cat !== c);
-                                setCustomCategories(updated);
-                                await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
-                              }
-                            }
-                          ]);
-                          if (Platform.OS === 'web' && window.confirm(`Deseja excluir a categoria "${c}"?`)) {
-                            const updated = customCategories.filter(cat => cat !== c);
-                            setCustomCategories(updated);
-                            await AsyncStorage.setItem("finly_custom_categories", JSON.stringify(updated));
-                          }
-                        }}>
-                          <Feather name="trash-2" size={12} color={Colors.error} />
-                        </Pressable>
-                      </>
-                    )}
-                  </View>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontWeight: 'bold', marginBottom: 8, color: Colors.textPrimary }}>Escolha um ícone</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  'tag',
+                  'coffee',
+                  'shopping-cart',
+                  'truck',
+                  'droplet',
+                  'heart',
+                  'book',
+                  'film',
+                  'home',
+                  'shopping-bag',
+                  'tool',
+                  'briefcase',
+                  'trending-up',
+                ].map((icon) => (
+                  <Pressable
+                    key={icon}
+                    onPress={() => setNewCategoryIcon(icon as keyof typeof Feather.glyphMap)}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: newCategoryIcon === icon ? Colors.primary : '#F1F5F9',
+                    }}
+                  >
+                    <Feather name={icon as any} size={20} color={newCategoryIcon === icon ? '#fff' : Colors.textPrimary} />
+                  </Pressable>
                 ))}
               </View>
-            )}
+            </View>
 
-            <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <TextInput
                 style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]}
                 placeholder="Nome da categoria..."

@@ -24,24 +24,39 @@ function resolveApiBaseUrl() {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+const REQUEST_TIMEOUT_MS = 8000;
+
 export async function apiRequest<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
-    ...options,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      data && typeof data.erro === "string" ? data.erro : "Erro na API";
-    throw new Error(message);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(options?.headers ?? {}),
+      },
+      signal: controller.signal,
+      ...options,
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message =
+        data && typeof data.erro === "string" ? data.erro : "Erro na API";
+      throw new Error(message);
+    }
+
+    return data as T;
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw new Error("Tempo de resposta excedido. Verifique sua conexão.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return data as T;
 }

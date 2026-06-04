@@ -27,6 +27,33 @@ router.get("/", (req, res) => {
   });
 });
 
+// POST /categorias — criar nova categoria global
+router.post("/", (req, res) => {
+  const { nome, icone, cor_hex, id_carteira = null } = req.body;
+
+  if (!nome || !icone || !cor_hex) {
+    return res.status(400).json({ erro: "Nome, ícone e cor são obrigatórios" });
+  }
+
+  const sql = `
+    INSERT INTO categorias (nome, cor_hex, icone, id_carteira)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id_categoria, nome, cor_hex, icone
+  `;
+
+  db.query(sql, [nome.trim(), cor_hex, icone, id_carteira], (err, result) => {
+    if (err) {
+      console.error("Erro ao criar categoria:", err);
+      if (err.code === "23505" || err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({ erro: "Categoria já existe" });
+      }
+      return res.status(500).json({ erro: "Erro ao criar categoria" });
+    }
+
+    res.status(201).json(result.rows[0]);
+  });
+});
+
 // GET /categorias/:id_carteira — categorias de uma carteira específica
 router.get("/:id_carteira", (req, res) => {
   const { id_carteira } = req.params;
