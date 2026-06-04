@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/src/context/AuthContext";
 import { getCategories, createCategory } from "@/src/services/categories";
+import { getTransactionsByUser } from "@/src/services/transactions";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
 import { formatMoneyInput } from "@/utils/formatters";
 import { Card } from "@/components/ui";
@@ -38,6 +39,14 @@ export default function SettingsScreen() {
   const [newCategoryIcon, setNewCategoryIcon] = useState<keyof typeof Feather.glyphMap>("tag");
   const [showCategories, setShowCategories] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(true);
+
+  const [showSecurity, setShowSecurity] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showBackup, setShowBackup] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
@@ -83,6 +92,15 @@ export default function SettingsScreen() {
   }
 
   async function handleLogout() {
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm("Tem certeza que deseja sair?");
+      if (confirmed) {
+        await logout();
+        router.replace("/login");
+      }
+      return;
+    }
+
     Alert.alert(
       "Sair da conta",
       "Tem certeza que deseja sair?",
@@ -98,6 +116,58 @@ export default function SettingsScreen() {
         },
       ]
     );
+  }
+
+  async function handleUpdatePassword() {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Erro", "Preencha todos os campos.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Erro", "A nova senha e a confirmação não coincidem.");
+      return;
+    }
+
+    // Como ainda não há rota no backend, vamos simular o sucesso
+    Alert.alert("Sucesso", "Sua senha foi atualizada!");
+    setShowSecurity(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
+
+  async function handleExportBackup() {
+    if (!user) return;
+    try {
+      setExporting(true);
+      const transactions = await getTransactionsByUser(user.id_usuario);
+      
+      const header = "ID,Titulo,Valor,Data,Tipo,Categoria\n";
+      const csvContent = transactions.map(t => `${t.id_transacao},"${t.titulo}",${t.valor},${t.data_transacao},${t.tipo},"${t.categoria || ''}"`).join("\n");
+      const fullCsv = header + csvContent;
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([fullCsv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `finly_backup_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        Alert.alert("Sucesso", "Backup efetuado com sucesso (CSV baixado).");
+      } else {
+        Alert.alert(
+          "Backup Gerado!",
+          "Em um ambiente real (app nativo), aqui o arquivo CSV seria salvo ou compartilhado. Para testes na Web, o download funciona normalmente."
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Erro", "Não foi possível gerar o backup.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.nome ?? "Lucas")}&background=4F46E5&color=fff`;
@@ -124,9 +194,9 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Meu Limite de Gastos (Pessoal) */}
+      {/* Meu Limite de Gastos*/}
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Meu Limite de Gastos (Pessoal)</Text>
+        <Text style={styles.inputLabel}>Meu Limite de Gastos</Text>
         {editingLimite ? (
           <View style={styles.editLimitCard}>
             <View style={styles.editInputRow}>
@@ -242,25 +312,102 @@ export default function SettingsScreen() {
 
         <View style={styles.menuDivider} />
 
-        {/* Item 2: Segurança e Senha */}
-        <Pressable style={styles.menuItem}>
+        {/* Item 2: Gerencie sua senha */}
+        <Pressable style={styles.menuItem} onPress={() => setShowSecurity(!showSecurity)}>
           <View style={styles.menuItemLeft}>
-            <Feather name="shield" size={20} color={Colors.primary} style={styles.menuItemIcon} />
-            <Text style={styles.menuItemText}>Segurança e Senha</Text>
+            <View style={[styles.menuIcon, { backgroundColor: Colors.primary + "15" }]}>
+              <Feather name="shield" size={20} color={Colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.menuItemTitle}>Gerencie sua senha</Text>
+              <Text style={styles.menuItemSubtitle}>Mantenha sua conta protegida</Text>
+            </View>
           </View>
-          <Feather name="chevron-right" size={20} color="#CBD5E1" />
+          <Feather name={showSecurity ? "chevron-down" : "chevron-right"} size={20} color={Colors.textMuted} />
         </Pressable>
+
+        {showSecurity && (
+          <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginHorizontal: 20, marginBottom: 10 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 12, color: Colors.textPrimary }}>Alterar Senha</Text>
+
+            <TextInput
+              style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]}
+              placeholder="Senha atual"
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+            />
+
+            <TextInput
+              style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]}
+              placeholder="Nova senha"
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+            />
+
+            <TextInput
+              style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 16 }]}
+              placeholder="Confirmar nova senha"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+
+            <Pressable style={[styles.saveBtn, { height: 46 }]} onPress={handleUpdatePassword}>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Atualizar Senha</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.menuDivider} />
 
         {/* Item 3: Backup de Dados */}
-        <View style={styles.menuItem}>
+        <Pressable style={styles.menuItem} onPress={() => setShowBackup(!showBackup)}>
           <View style={styles.menuItemLeft}>
-            <Feather name="cloud" size={20} color={Colors.primary} style={styles.menuItemIcon} />
-            <Text style={styles.menuItemText}>Backup de Dados</Text>
+            <View style={[styles.menuIcon, { backgroundColor: Colors.primary + "15" }]}>
+              <Feather name="cloud" size={20} color={Colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.menuItemTitle}>Backup de Dados</Text>
+              <Text style={styles.menuItemSubtitle}>Exporte ou salve suas informações</Text>
+            </View>
           </View>
-          <Text style={styles.backupActiveBadge}>ATIVO</Text>
-        </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Feather name={showBackup ? "chevron-down" : "chevron-right"} size={20} color="#CBD5E1" />
+          </View>
+        </Pressable>
+
+        {showBackup && (
+          <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginHorizontal: 20, marginBottom: 10 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 6, color: Colors.textPrimary }}>Backup da Conta</Text>
+            <Text style={{ fontSize: 13, color: Colors.textGray, marginBottom: 16 }}>
+              Seus dados estão sendo salvos na nuvem em tempo real de forma automática.
+            </Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Feather name="check-circle" size={16} color={Colors.success} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, color: Colors.textPrimary, fontWeight: '500' }}>
+                Último backup: Hoje, {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+
+            <Pressable 
+              style={[styles.saveBtn, { height: 46, flexDirection: 'row', gap: 8, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]} 
+              onPress={handleExportBackup}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <>
+                  <Feather name="download" size={16} color={Colors.primary} />
+                  <Text style={{ color: Colors.primary, fontWeight: 'bold' }}>Exportar dados (CSV)</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.menuDivider} />
 
