@@ -23,7 +23,7 @@ import { formatCurrency, getCurrentMonthYear } from "@/utils/formatters";
 import { CATEGORIAS } from "@/constants/categories";
 import { LineChart } from "react-native-gifted-charts";
 
-const FILTER_OPTIONS = ["Todos", "Receitas", "Despesas", "Conjuntas"];
+const FILTER_OPTIONS = ["Todos", "Receitas", "Despesas"];
 
 export default function HistoryScreen() {
   const { user } = useAuth();
@@ -35,6 +35,7 @@ export default function HistoryScreen() {
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [sortOrder, setSortOrder] = useState<"recent" | "oldest" | "highest" | "lowest">("recent");
   const [showSearch, setShowSearch] = useState(false);
+  const [showSort, setShowSort] = useState(false);
 
   const monthFilters = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
@@ -66,10 +67,10 @@ export default function HistoryScreen() {
       }
     });
     
-    // Sort descending (newest to oldest)
+    // Sort ascending (chronological)
     list.sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      return b.month - a.month;
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
     });
     
     return list;
@@ -81,10 +82,10 @@ export default function HistoryScreen() {
     year: number;
   } | null>(null);
 
-  // Selecionar o mês atual por padrão
+  // Selecionar o mês atual por padrão (último item)
   useEffect(() => {
     if (monthFilters.length > 0 && !activeMonthFilter) {
-      setActiveMonthFilter(monthFilters[0]);
+      setActiveMonthFilter(monthFilters[monthFilters.length - 1]);
     }
   }, [monthFilters]);
 
@@ -118,11 +119,16 @@ export default function HistoryScreen() {
 
     // Filtro por tipo/conjunta
     if (activeFilter === "Conjuntas") {
-      filtered = filtered.filter((t) => t.id_carteira === 3);
-    } else if (activeFilter === "Receitas") {
-      filtered = filtered.filter((t) => t.tipo === "RECEITA");
-    } else if (activeFilter === "Despesas") {
-      filtered = filtered.filter((t) => t.tipo === "DESPESA");
+      filtered = filtered.filter((t) => t.id_carteira === (user?.id_carteira_conjunta || 3));
+    } else {
+      // Remove a carteira conjunta do histórico pessoal
+      filtered = filtered.filter((t) => t.id_carteira !== (user?.id_carteira_conjunta || 3));
+
+      if (activeFilter === "Receitas") {
+        filtered = filtered.filter((t) => t.tipo === "RECEITA");
+      } else if (activeFilter === "Despesas") {
+        filtered = filtered.filter((t) => t.tipo === "DESPESA");
+      }
     }
 
     // Filtro por mês/ano
@@ -324,10 +330,48 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Histórico</Text>
-        <Pressable onPress={() => setShowSearch(!showSearch)} style={styles.searchToggleBtn}>
-          <Feather name="search" size={22} color={Colors.textPrimary} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <Pressable onPress={() => { setShowSort(!showSort); setShowSearch(false); }} style={styles.searchToggleBtn}>
+            <Feather name="sliders" size={22} color={Colors.textPrimary} />
+          </Pressable>
+          <Pressable onPress={() => { setShowSearch(!showSearch); setShowSort(false); }} style={styles.searchToggleBtn}>
+            <Feather name="search" size={22} color={Colors.textPrimary} />
+          </Pressable>
+        </View>
       </View>
+
+      {/* Sort Menu Dropdown */}
+      {showSort && (
+        <View style={styles.sortDropdown}>
+          <Text style={styles.sortDropdownTitle}>Ordenar transações por</Text>
+          {[
+            { key: "recent", label: "Mais recentes" },
+            { key: "oldest", label: "Mais antigas" },
+            { key: "highest", label: "Maior valor" },
+            { key: "lowest", label: "Menor valor" },
+          ].map((option, index, arr) => (
+            <Pressable
+              key={option.key}
+              style={[
+                styles.sortDropdownItem,
+                index === arr.length - 1 && { borderBottomWidth: 0 }
+              ]}
+              onPress={() => {
+                setSortOrder(option.key as any);
+                setShowSort(false);
+              }}
+            >
+              <Text style={[
+                styles.sortDropdownText,
+                sortOrder === option.key && { color: Colors.primary, fontWeight: 'bold' }
+              ]}>
+                {option.label}
+              </Text>
+              {sortOrder === option.key && <Feather name="check" size={18} color={Colors.primary} />}
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {/* Search Input (hidden by default) */}
       {showSearch && (
@@ -371,23 +415,38 @@ export default function HistoryScreen() {
         })}
       </ScrollView>
 
-      {/* Filters (Month Row) */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.filtersScroll, { marginBottom: 20 }]}
-        contentContainerStyle={styles.filtersContent}
-      >
-        {monthFilters.map((item) => (
-          <Chip
-            key={`${item.year}-${item.month}`}
-            label={item.label}
-            size="sm"
-            selected={activeMonthFilter?.month === item.month && activeMonthFilter?.year === item.year}
-            onPress={() => setActiveMonthFilter(item)}
-          />
-        ))}
-      </ScrollView>
+      {/* Month Selector */}
+      {monthFilters.length > 0 && activeMonthFilter && (
+        <View style={styles.monthSelector}>
+          <Pressable 
+            style={styles.monthArrow} 
+            onPress={() => {
+              const currentIndex = monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year);
+              if (currentIndex > 0) setActiveMonthFilter(monthFilters[currentIndex - 1]);
+            }}
+          >
+            <Feather name="chevron-left" size={24} color={
+              monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year) > 0 
+                ? Colors.textPrimary : Colors.textMuted
+            } />
+          </Pressable>
+          
+          <Text style={styles.monthLabel}>{activeMonthFilter.label}</Text>
+          
+          <Pressable 
+            style={styles.monthArrow}
+            onPress={() => {
+              const currentIndex = monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year);
+              if (currentIndex < monthFilters.length - 1) setActiveMonthFilter(monthFilters[currentIndex + 1]);
+            }}
+          >
+            <Feather name="chevron-right" size={24} color={
+              monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year) < monthFilters.length - 1 
+                ? Colors.textPrimary : Colors.textMuted
+            } />
+          </Pressable>
+        </View>
+      )}
 
       {/* Summary Card */}
       <Card style={styles.summaryCard}>
@@ -408,7 +467,7 @@ export default function HistoryScreen() {
         </View>
         <View style={styles.summaryTotal}>
           <Text style={styles.summaryTotalLabel}>
-            {filteredTransactions.length} transações
+            Lucro
           </Text>
           <Text style={[
             styles.summaryTotalValue,
@@ -419,48 +478,12 @@ export default function HistoryScreen() {
         </View>
       </Card>
 
-      {/* Trend Chart */}
-      {(lineData.length > 0 || lineData2.length > 0) && (
-        <Card style={styles.summaryCard}>
-          <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>
-            {activeFilter === "Todos" ? "Receitas vs Gastos" : activeFilter === "Receitas" ? "Tendência de Receitas" : "Tendência de Gastos"}
-          </Text>
-          <View style={{ alignItems: 'center' }}>
-            <LineChart
-              data={lineData.length > 0 ? lineData : [{value: 0}]}
-              {...(lineData2.length > 0 && activeFilter === "Todos" ? {
-                data2: lineData2,
-                color2: Colors.income,
-                startFillColor2: Colors.income,
-                endFillColor2: Colors.income,
-                startOpacity2: 0.3,
-                endOpacity2: 0.02,
-              } : {})}
-              areaChart
-              hideDataPoints
-              startFillColor={activeFilter === "Receitas" ? Colors.income : Colors.expense}
-              startOpacity={0.3}
-              endFillColor={activeFilter === "Receitas" ? Colors.income : Colors.expense}
-              endOpacity={0.02}
-              color={activeFilter === "Receitas" ? Colors.income : Colors.expense}
-              thickness={2}
-              xAxisThickness={0}
-              yAxisThickness={0}
-              hideYAxisText
-              hideRules
-              curved
-              height={100}
-              width={250}
-            />
-          </View>
-        </Card>
-      )}
 
       {/* Net Balance Chart */}
       {activeFilter === "Todos" && lineDataBalance.length > 0 && (
         <Card style={styles.summaryCard}>
           <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>
-            Saldo Diário (Receita - Despesa)
+            Saldo
           </Text>
           <View style={{ alignItems: 'center' }}>
             <LineChart
@@ -485,41 +508,8 @@ export default function HistoryScreen() {
         </Card>
       )}
 
-      {/* Sort Options */}
-      <View style={styles.sortContainer}>
-        <Text style={styles.sortLabel}>Ordenar por:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.sortOptions}>
-            {[
-              { key: "recent", label: "Recentes", icon: "clock" },
-              { key: "oldest", label: "Antigas", icon: "calendar" },
-              { key: "highest", label: "Maior valor", icon: "arrow-up" },
-              { key: "lowest", label: "Menor valor", icon: "arrow-down" },
-            ].map((option) => (
-              <Pressable
-                key={option.key}
-                style={[
-                  styles.sortOption,
-                  sortOrder === option.key && styles.sortOptionActive,
-                ]}
-                onPress={() => setSortOrder(option.key as any)}
-              >
-                <Feather
-                  name={option.icon as any}
-                  size={14}
-                  color={sortOrder === option.key ? Colors.primary : Colors.textMuted}
-                />
-                <Text style={[
-                  styles.sortOptionText,
-                  sortOrder === option.key && styles.sortOptionTextActive,
-                ]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
+
+
 
       {/* Transactions List */}
       {filteredTransactions.length === 0 ? (
@@ -664,40 +654,59 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
   },
-  sortContainer: {
-    marginBottom: Spacing.lg,
-  },
-  sortLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    marginBottom: Spacing.sm,
-  },
-  sortOptions: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
-  sortOption: {
+  monthSelector: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    justifyContent: "space-between",
     backgroundColor: Colors.surface,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  sortOptionActive: {
-    backgroundColor: Colors.primary + "15",
-    borderColor: Colors.primary,
+  monthArrow: {
+    padding: Spacing.xs,
   },
-  sortOptionText: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.medium,
+  monthLabel: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    textTransform: "capitalize",
   },
-  sortOptionTextActive: {
-    color: Colors.primary,
+  sortDropdown: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sortDropdownTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sortDropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  sortDropdownText: {
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
   },
   dateGroup: {
     marginBottom: Spacing.xl,
