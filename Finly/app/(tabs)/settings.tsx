@@ -165,7 +165,7 @@ export default function SettingsScreen() {
             </View>
             <View>
               <Text style={styles.menuItemTitle}>Categorias</Text>
-              <Text style={styles.menuItemSubtitle}>{CATEGORIAS.length + customCategories.length} categorias configuradas</Text>
+              <Text style={styles.menuItemSubtitle}>{categories.length} categorias configuradas</Text>
             </View>
           </View>
           <Feather name={showCategories ? "chevron-down" : "chevron-right"} size={20} color={Colors.textMuted} />

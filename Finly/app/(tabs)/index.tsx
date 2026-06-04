@@ -52,7 +52,7 @@ export default function DashboardScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [focusedCat, setFocusedCat] = useState<{name: string, value: number} | null>(null);
   
-  const [periodFilter, setPeriodFilter] = useState<'month' | '3months' | 'year' | 'all'>('month');
+
   const [chartType, setChartType] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
   const [walletFilter, setWalletFilter] = useState<'AMBAS' | 'PESSOAL' | 'CONJUNTA'>('AMBAS');
 
@@ -105,32 +105,15 @@ export default function DashboardScreen() {
       if (walletFilter === 'PESSOAL' && t.id_carteira !== user?.id_carteira_pessoal) return false;
       if (walletFilter === 'CONJUNTA' && t.id_carteira !== user?.id_carteira_conjunta) return false;
 
-      // Period filter
-      if (periodFilter === 'all') return true;
-
+      // Period filter (Forçado para mês atual)
       const parts = t.data_transacao.split('-');
       if (parts.length < 2) return true;
       const transYear = parseInt(parts[0], 10);
       const transMonth = parseInt(parts[1], 10) - 1;
 
-      if (periodFilter === 'month') {
-        return transYear === currentYear && transMonth === currentMonth;
-      }
-      
-      if (periodFilter === 'year') {
-        return transYear === currentYear;
-      }
-      
-      if (periodFilter === '3months') {
-        const transDate = new Date(transYear, transMonth, 1);
-        const threeMonthsAgo = new Date(currentYear, currentMonth - 2, 1);
-        const endOfCurrent = new Date(currentYear, currentMonth + 1, 0);
-        return transDate >= threeMonthsAgo && transDate <= endOfCurrent;
-      }
-      
-      return true;
+      return transYear === currentYear && transMonth === currentMonth;
     });
-  }, [transactions, periodFilter]);
+  }, [transactions, walletFilter, user]);
 
   const { saldo, totalDespesas, totalReceitas, expensesByCategory, incomesByCategory } = useMemo(() => {
     let s = 0;
@@ -188,12 +171,7 @@ export default function DashboardScreen() {
           <Text style={{fontSize: 38, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(saldo)}</Text>
         </View>
 
-        <View style={{flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 30}}>
-          <Chip label="Este Mês" size="sm" selected={periodFilter === 'month'} onPress={() => setPeriodFilter('month')} />
-          <Chip label="3 Meses" size="sm" selected={periodFilter === '3months'} onPress={() => setPeriodFilter('3months')} />
-          <Chip label="Este Ano" size="sm" selected={periodFilter === 'year'} onPress={() => setPeriodFilter('year')} />
-          <Chip label="Tudo" size="sm" selected={periodFilter === 'all'} onPress={() => setPeriodFilter('all')} />
-        </View>
+
 
         <View style={{flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20}}>
           <Pressable onPress={() => {setChartType("DESPESA"); setFocusedCat(null);}} style={[{paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20}, chartType === "DESPESA" ? {backgroundColor: '#FEE2E2'} : {backgroundColor: 'transparent'}]}>

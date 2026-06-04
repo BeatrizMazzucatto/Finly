@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, Alert, TextInput } from 'react-native';
 import { Feather } from "@expo/vector-icons";
 import { getCategories, Category } from "@/src/services/categories";
 
@@ -52,21 +52,13 @@ export function TransactionModal({ visible, onClose, onSave, hasJointWallet = fa
     }
     if (visible) loadCategories();
   }, [visible]);
-    if (!visible) {
-      setTxValor("");
-      setTxTitulo("");
-      setTxTipo("DESPESA");
-      setTxCategoria("Alimentação");
-      setTxCarteira("PESSOAL");
-    }
-  }, [visible]);
 
   const handleClose = () => {
     // Reseta imediatamente antes de fechar
     setTxValor("");
     setTxTitulo("");
     setTxTipo("DESPESA");
-    setTxCategoria("Alimentação");
+    setSelectedCategoryId(null);
     setTxCarteira("PESSOAL");
     onClose();
   };
