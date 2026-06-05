@@ -82,15 +82,15 @@ export default function TransactionFormScreen() {
 
   useEffect(() => {
     if (params.id_carteira) {
-      setIsConjunta(Number(params.id_carteira) === 3);
+      setIsConjunta(Number(params.id_carteira) === user?.id_carteira_conjunta);
     } else {
       AsyncStorage.getItem(CARTEIRA_KEY).then((val) => {
         if (val) {
-          setIsConjunta(Number(val) === 3);
+          setIsConjunta(Number(val) === user?.id_carteira_conjunta);
         }
       });
     }
-  }, [params.id_carteira]);
+  }, [params.id_carteira, user?.id_carteira_conjunta]);
 
   function handleValorChange(text: string) {
     setValor(formatMoneyInput(text));
@@ -118,18 +118,28 @@ export default function TransactionFormScreen() {
     return null;
   }
 
-  useEffect(() => {
-    async function loadCategorias() {
-      try {
-        const loaded = await getCategories();
-        setCategorias(loaded);
-      } catch {
-        setCategorias([]);
-      }
-      setLoadingCats(false);
+  async function loadCategorias() {
+    setLoadingCats(true);
+    try {
+      const carteiraId = isConjunta ? user?.id_carteira_conjunta : user?.id_carteira_pessoal;
+      const loaded = await getCategories(carteiraId);
+      setCategorias(loaded);
+    } catch {
+      setCategorias([]);
     }
+    setLoadingCats(false);
+  }
+
+  useEffect(() => {
     loadCategorias();
-  }, []);
+  }, [isConjunta]);
+
+  useEffect(() => {
+    if (!idCategoria && params.categoria_nome && categorias.length > 0) {
+      const match = categorias.find(c => c.nome === params.categoria_nome);
+      if (match) setIdCategoria(match.id_categoria);
+    }
+  }, [categorias, idCategoria, params.categoria_nome]);
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -151,7 +161,7 @@ export default function TransactionFormScreen() {
     try {
       const dataISO = parseDataToISO(data)!;
       const valorNum = Math.abs(parseMoneyInput(valor));
-      const idCarteira = isConjunta ? 3 : 1;
+      const idCarteira = isConjunta ? user?.id_carteira_conjunta : user?.id_carteira_pessoal;
 
       const payload = {
         id_carteira: idCarteira,

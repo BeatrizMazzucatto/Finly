@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, Text, View, StatusBar, Platform, Alert, Modal, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { StyleSheet, Text, View, StatusBar, Platform, Alert, Modal, TextInput, Pressable, ActivityIndicator, ScrollView, RefreshControl } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Colors, Spacing } from "@/constants/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import { Transaction } from "@/src/types/api";
 import { getTransactionsByUser } from "@/src/services/transactions";
 import { PieChart } from "react-native-gifted-charts";
+import { TransactionItem } from "@/components/ui";
+import { CATEGORIAS, getCategoryColor } from "@/constants/categories";
+import { formatCurrency, formatCurrencyShort } from "@/utils/formatters";
+import { router } from "expo-router";
+import { apiRequest } from "@/src/services/api";
+import { CategoryCard } from "@/components/CategoryCard";
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === "web") {
@@ -34,13 +40,23 @@ export default function GroupsScreen() {
   const [joinCode, setJoinCode] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
 
-  async function loadTransactions() {
-    if (!user?.id_usuario) return;
+  const [refreshing, setRefreshing] = useState(false);
+  const [chartType, setChartType] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
+  const [focusedCat, setFocusedCat] = useState<{name: string, value: number} | null>(null);
+
+  async function loadTransactions(isPullToRefresh = false) {
+    if (!user?.id_usuario || !user?.id_carteira_conjunta) return;
     try {
+      if (isPullToRefresh) setRefreshing(true);
       const data = await getTransactionsByUser(user.id_usuario);
-      setTransactions(data);
+      const jointData = data.filter(t => t.id_carteira === user.id_carteira_conjunta);
+      // Sort newest first
+      jointData.sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime());
+      setTransactions(jointData);
     } catch (err) {
       console.error("Erro ao carregar transações no grupo:", err);
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -214,11 +230,100 @@ export default function GroupsScreen() {
     setModalSettingsVisible(true);
   };
 
+  const monthFilters = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    const months = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+    
+    const uniqueMonths = new Set<string>();
+    const list: {label: string, month: number, year: number}[] = [];
+    const currentYear = new Date().getFullYear();
+    
+    transactions.forEach(t => {
+      const parts = t.data_transacao.split("-");
+      if (parts.length >= 2) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // 0-indexed
+        const key = `${year}-${month}`;
+        
+        if (!uniqueMonths.has(key)) {
+          uniqueMonths.add(key);
+          list.push({
+            label: year === currentYear ? months[month] : `${months[month]} ${year}`,
+            month,
+            year
+          });
+        }
+      }
+    });
+    
+    list.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+    
+    return list;
+  }, [transactions]);
+
+  const [activeMonthFilter, setActiveMonthFilter] = useState<{
+    label: string;
+    month: number;
+    year: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (monthFilters.length > 0 && !activeMonthFilter) {
+      setActiveMonthFilter(monthFilters[monthFilters.length - 1]);
+    }
+  }, [monthFilters]);
+
+  const filteredTransactions = useMemo(() => {
+    let filtered = [...transactions];
+    if (activeMonthFilter) {
+      filtered = filtered.filter((t) => {
+        const parts = t.data_transacao.split("-");
+        if (parts.length >= 2) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          return year === activeMonthFilter.year && month === activeMonthFilter.month;
+        }
+        return false;
+      });
+    }
+    return filtered;
+  }, [transactions, activeMonthFilter]);
+
+  const { saldo, totalDespesas, totalReceitas, expensesByCategory, incomesByCategory } = useMemo(() => {
+    let s = 0;
+    let d = 0;
+    let r = 0;
+    let expCats: Record<string, number> = {};
+    let incCats: Record<string, number> = {};
+
+    filteredTransactions.forEach(t => {
+      const val = Number(t.valor);
+      const c = t.categoria || "Outros";
+      if (t.tipo === "RECEITA") {
+        s += val;
+        r += val;
+        incCats[c] = (incCats[c] || 0) + val;
+      } else {
+        s -= val;
+        d += val;
+        expCats[c] = (expCats[c] || 0) + val;
+      }
+    });
+    return { saldo: s, totalDespesas: d, totalReceitas: r, expensesByCategory: expCats, incomesByCategory: incCats };
+  }, [filteredTransactions]);
+
   const totalDespesasConjuntas = useMemo(() => {
-    return transactions
-      .filter((t) => t.id_carteira === user?.id_carteira_conjunta && t.tipo === "DESPESA")
+    return filteredTransactions
+      .filter((t) => t.tipo === "DESPESA")
       .reduce((sum, item) => sum + Number(item.valor), 0);
-  }, [transactions, user?.id_carteira_conjunta]);
+  }, [filteredTransactions]);
 
   const progressPercentage = useMemo(() => {
     if (tetoLimit <= 0) return 0;
@@ -230,6 +335,64 @@ export default function GroupsScreen() {
     if (progressPercentage >= 80) return Colors.warning;
     return Colors.jointPrimary;
   }, [progressPercentage]);
+
+  function handleEdit(item: Transaction) {
+    router.push({
+      pathname: "/transaction-form",
+      params: {
+        id_transacao: String(item.id_transacao),
+        titulo: item.titulo,
+        valor: String(item.valor),
+        tipo: item.tipo,
+        categoria_nome: item.categoria ?? "",
+        data_transacao: item.data_transacao,
+        id_carteira: String(item.id_carteira ?? 1),
+      },
+    });
+  }
+
+  function handleDelete(item: Transaction) {
+    const doDelete = async () => {
+      try {
+        await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
+        await loadTransactions();
+      } catch (err) {
+        showAlert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm(`Excluir transação\n\nDeseja excluir "${item.titulo}"?`)) doDelete();
+    } else {
+      Alert.alert("Excluir transação", `Deseja excluir "${item.titulo}"?`, [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Excluir", style: "destructive", onPress: doDelete },
+      ]);
+    }
+  }
+
+  function formatDateHeader(dateStr: string): string {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (dateStr === today.toISOString().split("T")[0]) return "Hoje";
+    if (dateStr === yesterday.toISOString().split("T")[0]) return "Ontem";
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
+  }
+
+  // Agrupar transações por data
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+    filteredTransactions.forEach((t) => {
+      const date = t.data_transacao;
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(t);
+    });
+    return groups;
+  }, [filteredTransactions]);
 
   return (
     <View style={styles.container}>
@@ -243,7 +406,11 @@ export default function GroupsScreen() {
         )}
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content} 
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { loadTransactions(true); loadWalletData(); }} />}
+        showsVerticalScrollIndicator={false}
+      >
         {!user?.id_carteira_conjunta ? (
           <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
             <View style={styles.iconContainer}>
@@ -268,63 +435,240 @@ export default function GroupsScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Limite Mensal do Grupo</Text>
-              <PieChart
-                donut
-                radius={80}
-                innerRadius={60}
-                data={[
-                  {value: totalDespesasConjuntas, color: progressBarColor},
-                  {value: Math.max(tetoLimit - totalDespesasConjuntas, 0), color: Colors.border}
-                ]}
-                centerLabelComponent={() => (
-                  <View style={{alignItems: 'center'}}>
-                    <Text style={{fontSize: 24, fontWeight: 'bold', color: progressBarColor}}>{progressPercentage}%</Text>
-                  </View>
-                )}
-              />
-              <Text style={styles.limitText}>Gasto: R$ {totalDespesasConjuntas.toFixed(2)} / R$ {tetoLimit.toFixed(2)}</Text>
-              
-              {progressPercentage >= 80 && (
-                <View style={styles.alertBox}>
-                  <Feather name="alert-triangle" size={20} color={Colors.warning} />
-                  <Text style={styles.alertText}>Atenção: O grupo atingiu {progressPercentage}% do limite mensal!</Text>
+            {monthFilters.length > 0 && activeMonthFilter && (
+              <View style={styles.monthSelector}>
+                <Pressable 
+                  style={styles.monthArrow} 
+                  onPress={() => {
+                    const currentIndex = monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year);
+                    if (currentIndex > 0) setActiveMonthFilter(monthFilters[currentIndex - 1]);
+                  }}
+                >
+                  <Feather name="chevron-left" size={24} color={
+                    monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year) > 0 
+                      ? Colors.textPrimary : Colors.textMuted
+                  } />
+                </Pressable>
+                
+                <Text style={styles.monthLabel}>{activeMonthFilter.label}</Text>
+                
+                <Pressable 
+                  style={styles.monthArrow}
+                  onPress={() => {
+                    const currentIndex = monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year);
+                    if (currentIndex < monthFilters.length - 1) setActiveMonthFilter(monthFilters[currentIndex + 1]);
+                  }}
+                >
+                  <Feather name="chevron-right" size={24} color={
+                    monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year) < monthFilters.length - 1 
+                      ? Colors.textPrimary : Colors.textMuted
+                  } />
+                </Pressable>
+              </View>
+            )}
+
+            <View style={[styles.card, { alignItems: 'stretch' }]}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                <Text style={{fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary}}>Equipe do Grupo</Text>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  {activeMembers.map((m, i) => (
+                    <View key={m.id_usuario} style={{width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.jointPrimary, marginLeft: i > 0 ? -10 : 0, borderWidth: 2, borderColor: 'white', justifyContent: 'center', alignItems: 'center'}}>
+                      <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold'}}>{m.nome.substring(0,2).toUpperCase()}</Text>
+                    </View>
+                  ))}
+                  <Pressable onPress={handleShowInviteCode} style={{width: 30, height: 30, borderRadius: 15, backgroundColor: '#F1F5F9', marginLeft: -10, borderWidth: 2, borderColor: 'white', justifyContent: 'center', alignItems: 'center'}}>
+                    <Feather name="plus" size={14} color={Colors.jointPrimary} />
+                  </Pressable>
                 </View>
+              </View>
+
+              <View style={{marginTop: 20}}>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5}}>
+                  <Text style={{fontSize: 12, color: Colors.textSecondary, fontWeight: 'bold', textTransform: 'uppercase'}}>Limite Mensal</Text>
+                  <Text style={{fontSize: 12, color: Colors.textPrimary, fontWeight: 'bold'}}>{formatCurrencyShort(totalDespesasConjuntas)} / {formatCurrencyShort(tetoLimit)}</Text>
+                </View>
+                <View style={{height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden'}}>
+                  <View style={{height: '100%', width: `${progressPercentage}%`, backgroundColor: progressBarColor}} />
+                </View>
+                {progressPercentage >= 80 && (
+                  <Text style={{color: Colors.warning, fontSize: 10, marginTop: 5, fontWeight: 'bold'}}>Atenção: O grupo atingiu {progressPercentage}% do limite mensal!</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.balanceContainer}>
+              <Text style={{color: '#64748B', fontSize: 14, fontWeight: '600', textTransform: 'uppercase'}}>Balanço do Período</Text>
+              <Text style={{fontSize: 38, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(saldo)}</Text>
+            </View>
+
+            <View style={{flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20}}>
+              <Pressable onPress={() => {setChartType("DESPESA"); setFocusedCat(null);}} style={[{paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20}, chartType === "DESPESA" ? {backgroundColor: '#FEE2E2'} : {backgroundColor: 'transparent'}]}>
+                <Text style={{color: chartType === "DESPESA" ? '#EF4444' : '#64748B', fontWeight: 'bold'}}>Despesas</Text>
+              </Pressable>
+              <Pressable onPress={() => {setChartType("RECEITA"); setFocusedCat(null);}} style={[{paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20}, chartType === "RECEITA" ? {backgroundColor: '#D1FAE5'} : {backgroundColor: 'transparent'}]}>
+                <Text style={{color: chartType === "RECEITA" ? '#10B981' : '#64748B', fontWeight: 'bold'}}>Receitas</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ alignItems: 'center', marginBottom: 40 }}>
+              {chartType === "DESPESA" ? (
+                Object.entries(expensesByCategory).length > 0 ? (
+                  <PieChart
+                    data={Object.entries(expensesByCategory).map(([cat, val]) => ({
+                      value: val,
+                      color: getCategoryColor(cat),
+                      focused: focusedCat?.name === cat,
+                      onPress: () => {
+                        if (focusedCat?.name === cat) {
+                          setFocusedCat(null);
+                        } else {
+                          setFocusedCat({ name: cat, value: val });
+                        }
+                      }
+                    }))}
+                    donut
+                    focusOnPress
+                    toggleFocusOnPress
+                    radius={100}
+                    innerRadius={70}
+                    innerCircleColor={'#F8FAFC'}
+                    centerLabelComponent={() => {
+                      if (focusedCat) {
+                        return (
+                          <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                            <Text style={{fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold'}}>{focusedCat.name}</Text>
+                            <Text style={{fontSize: 20, color: '#0F172A', fontWeight: 'bold'}}>{formatCurrency(focusedCat.value)}</Text>
+                          </View>
+                        );
+                      }
+                      return (
+                        <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                          <Text style={{fontSize: 12, color: '#64748B', fontWeight: 'bold'}}>Despesas</Text>
+                          <Text style={{fontSize: 20, color: '#EF4444', fontWeight: 'bold'}}>{formatCurrency(totalDespesas)}</Text>
+                        </View>
+                      );
+                    }}
+                  />
+                ) : (
+                  <View style={styles.ringContainer}>
+                    <View style={styles.ringInner}>
+                      <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Despesas</Text>
+                      <Text style={{fontSize: 24, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(totalDespesas)}</Text>
+                    </View>
+                  </View>
+                )
+              ) : (
+                Object.entries(incomesByCategory).length > 0 ? (
+                  <PieChart
+                    data={Object.entries(incomesByCategory).map(([cat, val]) => ({
+                      value: val,
+                      color: getCategoryColor(cat),
+                      focused: focusedCat?.name === cat,
+                      onPress: () => {
+                        if (focusedCat?.name === cat) {
+                          setFocusedCat(null);
+                        } else {
+                          setFocusedCat({ name: cat, value: val });
+                        }
+                      }
+                    }))}
+                    donut
+                    focusOnPress
+                    toggleFocusOnPress
+                    radius={100}
+                    innerRadius={70}
+                    innerCircleColor={'#F8FAFC'}
+                    centerLabelComponent={() => {
+                      if (focusedCat) {
+                        return (
+                          <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                            <Text style={{fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold'}}>{focusedCat.name}</Text>
+                            <Text style={{fontSize: 20, color: '#0F172A', fontWeight: 'bold'}}>{formatCurrency(focusedCat.value)}</Text>
+                          </View>
+                        );
+                      }
+                      return (
+                        <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                          <Text style={{fontSize: 12, color: '#64748B', fontWeight: 'bold'}}>Receitas</Text>
+                          <Text style={{fontSize: 20, color: '#10B981', fontWeight: 'bold'}}>{formatCurrency(totalReceitas)}</Text>
+                        </View>
+                      );
+                    }}
+                  />
+                ) : (
+                  <View style={styles.ringContainer}>
+                    <View style={styles.ringInner}>
+                      <Text style={{color: '#64748B', fontSize: 12, fontWeight: '600'}}>Receitas</Text>
+                      <Text style={{fontSize: 24, fontWeight: 'bold', color: '#0F172A'}}>{formatCurrency(totalReceitas)}</Text>
+                    </View>
+                  </View>
+                )
               )}
             </View>
 
-            <View style={styles.card}>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
-                <Text style={styles.cardTitle}>Membros do Grupo</Text>
-                <Feather name="users" size={24} color={Colors.jointPrimary} />
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {chartType === 'DESPESA' ? 'Gastos por Categoria' : 'Receitas por Categoria'}
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 12, paddingBottom: 16, marginBottom: 20}}>
+              {Object.entries(chartType === 'DESPESA' ? expensesByCategory : incomesByCategory).length === 0 ? (
+                <Text style={{color: '#64748B', paddingHorizontal: 16}}>
+                  {chartType === 'DESPESA' ? 'Nenhum gasto registrado.' : 'Nenhuma receita registrada.'}
+                </Text>
+              ) : (
+                Object.entries(chartType === 'DESPESA' ? expensesByCategory : incomesByCategory).map(([cat, val]) => (
+                  <CategoryCard key={cat} category={cat} value={val} formatCurrency={formatCurrency} />
+                ))
+              )}
+            </ScrollView>
+
+            {/* Histórico Conjunto */}
+            <View style={{ width: '100%', marginBottom: 30 }}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
+                <Text style={styles.cardTitle}>Últimas Transações</Text>
+                <Pressable onPress={() => router.push({ pathname: '/transaction-form', params: { id_carteira: String(user?.id_carteira_conjunta) } })}>
+                  <Feather name="plus-circle" size={24} color={Colors.jointPrimary} />
+                </Pressable>
               </View>
-              
-              {activeMembers.length > 0 ? (
-                activeMembers.map((member) => (
-                  <View key={member.id_usuario} style={styles.memberRow}>
-                    <View style={styles.memberAvatar}>
-                      <Text style={styles.memberInitials}>{member.nome.substring(0, 2).toUpperCase()}</Text>
-                    </View>
-                    <View style={{flex: 1}}>
-                      <Text style={styles.memberName}>{member.nome} {member.id_usuario === user?.id_usuario && "(Você)"}</Text>
-                      <Text style={styles.memberRole}>{member.papel === 'PROPRIETARIO' ? 'Administrador' : 'Membro'}</Text>
+
+              {filteredTransactions.length === 0 ? (
+                <View style={[styles.card, { alignItems: 'center', paddingVertical: 40 }]}>
+                  <Feather name="inbox" size={40} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textPrimary, fontWeight: 'bold', marginTop: 10 }}>Nenhuma transação</Text>
+                  <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: 5 }}>Nenhuma transação neste mês.</Text>
+                </View>
+              ) : (
+                Object.entries(groupedTransactions).map(([date, items]) => (
+                  <View key={date} style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: Colors.textSecondary, textTransform: 'uppercase', marginBottom: 10 }}>
+                      {formatDateHeader(date)}
+                    </Text>
+                    <View style={{ gap: 10 }}>
+                      {items.map((item) => (
+                        <TransactionItem
+                          key={item.id_transacao}
+                          id={item.id_transacao}
+                          id_carteira={item.id_carteira}
+                          usuario_nome={item.usuario_nome}
+                          titulo={item.titulo}
+                          valor={Number(item.valor)}
+                          tipo={item.tipo}
+                          categoria={item.categoria ?? "Outros"}
+                          data={item.data_transacao}
+                          showActions
+                          onEdit={() => handleEdit(item)}
+                          onDelete={() => handleDelete(item)}
+                        />
+                      ))}
                     </View>
                   </View>
                 ))
-              ) : (
-                <Text style={{color: Colors.textMuted}}>Carregando membros...</Text>
               )}
-
-              <View style={styles.inviteButtonContainer}>
-                <Text style={styles.inviteLink} onPress={handleShowInviteCode}>
-                  <Feather name="plus" size={16} /> Convidar novo membro
-                </Text>
-              </View>
             </View>
           </>
         )}
-      </View>
+      </ScrollView>
 
       {/* MODAL: CRIAR CARTEIRA */}
       <Modal visible={modalCreateVisible} transparent animationType="slide">
@@ -506,5 +850,17 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 20 },
   modalBtn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
   settingsMenuBtn: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, gap: 10 },
-  settingsMenuText: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary }
+  settingsMenuText: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary },
+  
+  // Dashboard Styles
+  balanceContainer: { alignItems: 'center', marginBottom: 20 },
+  ringContainer: { alignSelf: 'center', width: 200, height: 200, borderRadius: 100, borderWidth: 15, borderColor: '#4F46E5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  ringInner: { alignItems: 'center' },
+  sectionHeader: { marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
+
+  // Month Selector
+  monthSelector: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surface, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: 100, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
+  monthArrow: { padding: Spacing.xs },
+  monthLabel: { fontSize: 16, fontWeight: "bold", color: Colors.textPrimary, textTransform: "capitalize" },
 });

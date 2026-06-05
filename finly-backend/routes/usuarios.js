@@ -15,8 +15,8 @@ router.post("/login", async (req, res) => {
 
   const sql = `
     SELECT u.id_usuario, u.nome, u.email, u.senha_hash,
-      (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'PESSOAL' LIMIT 1) as id_carteira_pessoal,
-      (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'CONJUNTA' LIMIT 1) as id_carteira_conjunta
+      (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'PESSOAL' ORDER BY id_carteira DESC LIMIT 1) as id_carteira_pessoal,
+      (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'CONJUNTA' ORDER BY id_carteira DESC LIMIT 1) as id_carteira_conjunta
     FROM usuarios u
     WHERE u.email = $1
     LIMIT 1
@@ -78,20 +78,9 @@ router.post("/", async (req, res) => {
 
     const newUserId = result.rows[0].id_usuario;
 
-    // Vincula automaticamente às carteiras 1 (Pessoal) e 3 (Conjunta)
-    const linkSql = `
-      INSERT INTO usuarios_carteiras (id_usuario, id_carteira, papel, renda_mensal_alocada)
-      VALUES ($1, 1, 'PROPRIETARIO', 0.00), ($1, 3, 'MEMBRO', 0.00)
-      ON CONFLICT (id_usuario, id_carteira) DO NOTHING
-    `;
-    db.query(linkSql, [newUserId], (linkErr) => {
-      if (linkErr) {
-        console.error("Erro ao vincular carteiras padrão ao novo usuário:", linkErr);
-      }
-      return res.status(201).json({
-        mensagem: "Usuário criado com sucesso",
-        id_usuario: newUserId,
-      });
+    return res.status(201).json({
+      mensagem: "Usuário criado com sucesso",
+      id_usuario: newUserId,
     });
   });
 });

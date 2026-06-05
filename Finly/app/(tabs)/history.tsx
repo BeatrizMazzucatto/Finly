@@ -96,7 +96,8 @@ export default function HistoryScreen() {
       else setLoading(true);
 
       const data = await getTransactionsByUser(user.id_usuario);
-      const sorted = [...data].sort(
+      const personalData = data.filter(t => t.id_carteira === user.id_carteira_pessoal);
+      const sorted = [...personalData].sort(
         (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
       );
       setTransactions(sorted);
@@ -117,18 +118,11 @@ export default function HistoryScreen() {
   useEffect(() => {
     let filtered = [...transactions];
 
-    // Filtro por tipo/conjunta
-    if (activeFilter === "Conjuntas") {
-      filtered = filtered.filter((t) => t.id_carteira === (user?.id_carteira_conjunta || 3));
-    } else {
-      // Remove a carteira conjunta do histórico pessoal
-      filtered = filtered.filter((t) => t.id_carteira !== (user?.id_carteira_conjunta || 3));
-
-      if (activeFilter === "Receitas") {
-        filtered = filtered.filter((t) => t.tipo === "RECEITA");
-      } else if (activeFilter === "Despesas") {
-        filtered = filtered.filter((t) => t.tipo === "DESPESA");
-      }
+    // Filtro por tipo
+    if (activeFilter === "Receitas") {
+      filtered = filtered.filter((t) => t.tipo === "RECEITA");
+    } else if (activeFilter === "Despesas") {
+      filtered = filtered.filter((t) => t.tipo === "DESPESA");
     }
 
     // Filtro por mês/ano
