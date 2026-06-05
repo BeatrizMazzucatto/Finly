@@ -21,6 +21,7 @@ import { getTransactionsByUser } from "@/src/services/transactions";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
 import { formatMoneyInput } from "@/utils/formatters";
 import { Card } from "@/components/ui";
+import { CategoryManagerModal } from "@/components/CategoryManagerModal";
 
 const LIMITE_KEY = "finly_limite_gastos";
 
@@ -34,11 +35,9 @@ export default function SettingsScreen() {
     nome: string;
     cor_hex: string;
     icone: string;
+    id_carteira?: number | null;
   }[]>([]);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryIcon, setNewCategoryIcon] = useState<keyof typeof Feather.glyphMap>("tag");
-  const [showCategories, setShowCategories] = useState(false);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [isCategoryManagerVisible, setIsCategoryManagerVisible] = useState(false);
 
   const [showSecurity, setShowSecurity] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -48,37 +47,23 @@ export default function SettingsScreen() {
   const [showBackup, setShowBackup] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  async function loadCategories() {
+    if (user?.id_carteira_pessoal) {
+      const loadedCategories = await getCategories(user.id_carteira_pessoal).catch(() => []);
+      setCategories(loadedCategories);
+    }
+  }
+
   useEffect(() => {
     async function loadSettings() {
       const limiteStored = await AsyncStorage.getItem(LIMITE_KEY);
       if (limiteStored) setLimite(Number(limiteStored).toLocaleString("pt-BR", { minimumFractionDigits: 2 }));
-
-      const loadedCategories = await getCategories().catch(() => []);
-      setCategories(loadedCategories);
-      setLoadingCategories(false);
     }
     loadSettings();
-  }, []);
+    loadCategories();
+  }, [user?.id_carteira_pessoal]);
 
-  async function handleAddCategory() {
-    if (!newCategoryName.trim()) {
-      Alert.alert("Erro", "Digite o nome da categoria.");
-      return;
-    }
 
-    try {
-      const created = await createCategory({
-        nome: newCategoryName.trim(),
-        icone: newCategoryIcon,
-        cor_hex: Colors.categories.outros,
-      });
-      setCategories((prev) => [...prev, created]);
-      setNewCategoryName("");
-      Alert.alert("Sucesso", "Categoria criada!");
-    } catch (err) {
-      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível criar a categoria.");
-    }
-  }
 
   async function handleSaveLimite() {
     const limiteNum = parseFloat(limite.replace(/\./g, "").replace(",", ".")) || 0;
@@ -228,7 +213,7 @@ export default function SettingsScreen() {
 
       {/* Categorias */}
       <Card style={styles.menuCard}>
-        <Pressable style={styles.menuItem} onPress={() => setShowCategories(!showCategories)}>
+        <Pressable style={styles.menuItem} onPress={() => setIsCategoryManagerVisible(true)}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIcon, { backgroundColor: Colors.warning + "15" }]}>
               <Feather name="tag" size={20} color={Colors.warning} />
@@ -238,77 +223,8 @@ export default function SettingsScreen() {
               <Text style={styles.menuItemSubtitle}>{categories.length} categorias configuradas</Text>
             </View>
           </View>
-          <Feather name={showCategories ? "chevron-down" : "chevron-right"} size={20} color={Colors.textMuted} />
+          <Feather name="chevron-right" size={20} color={Colors.textMuted} />
         </Pressable>
-
-        {showCategories && (
-          <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginTop: 10, marginBottom: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <View>
-                <Text style={{ fontWeight: 'bold', marginBottom: 4, color: Colors.textPrimary }}>Categorias Disponíveis</Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{categories.length} categorias configuradas</Text>
-              </View>
-              {loadingCategories ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
-            </View>
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-              {categories.map((c) => (
-                <View key={c.id_categoria} style={{ backgroundColor: c.cor_hex + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Feather name={c.icone as any} size={12} color={c.cor_hex} />
-                  <Text style={{ color: c.cor_hex, fontWeight: '600', fontSize: 12 }}>{c.nome}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ fontWeight: 'bold', marginBottom: 8, color: Colors.textPrimary }}>Escolha um ícone</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {[
-                  'tag',
-                  'coffee',
-                  'shopping-cart',
-                  'truck',
-                  'droplet',
-                  'heart',
-                  'book',
-                  'film',
-                  'home',
-                  'shopping-bag',
-                  'tool',
-                  'briefcase',
-                  'trending-up',
-                ].map((icon) => (
-                  <Pressable
-                    key={icon}
-                    onPress={() => setNewCategoryIcon(icon as keyof typeof Feather.glyphMap)}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 14,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: newCategoryIcon === icon ? Colors.primary : '#F1F5F9',
-                    }}
-                  >
-                    <Feather name={icon as any} size={20} color={newCategoryIcon === icon ? '#fff' : Colors.textPrimary} />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-              <TextInput
-                style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]}
-                placeholder="Nome da categoria..."
-                value={newCategoryName}
-                onChangeText={setNewCategoryName}
-              />
-              <Pressable style={[styles.saveBtn, { paddingHorizontal: 20, height: 46 }]} onPress={handleAddCategory}>
-                <Feather name="plus" size={18} color="#fff" />
-              </Pressable>
-            </View>
-          </View>
-        )}
 
         <View style={styles.menuDivider} />
 
@@ -421,6 +337,14 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
       </Card>
+
+      <CategoryManagerModal
+        visible={isCategoryManagerVisible}
+        onClose={() => setIsCategoryManagerVisible(false)}
+        categorias={categories}
+        idCarteira={user?.id_carteira_pessoal || 1}
+        onCategoriesChanged={loadCategories}
+      />
     </ScrollView>
   );
 }

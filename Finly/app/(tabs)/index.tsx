@@ -54,7 +54,6 @@ export default function DashboardScreen() {
   
 
   const [chartType, setChartType] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
-  const [walletFilter, setWalletFilter] = useState<'AMBAS' | 'PESSOAL' | 'CONJUNTA'>('AMBAS');
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -102,8 +101,7 @@ export default function DashboardScreen() {
 
     return transactions.filter(t => {
       // Wallet filter
-      if (walletFilter === 'PESSOAL' && t.id_carteira !== user?.id_carteira_pessoal) return false;
-      if (walletFilter === 'CONJUNTA' && t.id_carteira !== user?.id_carteira_conjunta) return false;
+      if (t.id_carteira !== user?.id_carteira_pessoal) return false;
 
       // Period filter (Forçado para mês atual)
       const parts = t.data_transacao.split('-');
@@ -113,7 +111,7 @@ export default function DashboardScreen() {
 
       return transYear === currentYear && transMonth === currentMonth;
     });
-  }, [transactions, walletFilter, user]);
+  }, [transactions, user]);
 
   const { saldo, totalDespesas, totalReceitas, expensesByCategory, incomesByCategory } = useMemo(() => {
     let s = 0;
@@ -151,20 +149,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Wallet Filter Toggle (Only show if user has joint wallet) */}
-        {user?.id_carteira_conjunta && (
-          <View style={{flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 12, padding: 4, marginBottom: 20}}>
-            <Pressable style={[styles.walletToggleBtn, walletFilter === 'PESSOAL' && {backgroundColor: 'white', shadowOpacity: 0.1}]} onPress={() => setWalletFilter('PESSOAL')}>
-              <Text style={{color: walletFilter === 'PESSOAL' ? '#4F46E5' : '#64748B', fontWeight: 'bold'}}>Pessoal</Text>
-            </Pressable>
-            <Pressable style={[styles.walletToggleBtn, walletFilter === 'AMBAS' && {backgroundColor: 'white', shadowOpacity: 0.1}]} onPress={() => setWalletFilter('AMBAS')}>
-              <Text style={{color: walletFilter === 'AMBAS' ? '#0F172A' : '#64748B', fontWeight: 'bold'}}>Geral</Text>
-            </Pressable>
-            <Pressable style={[styles.walletToggleBtn, walletFilter === 'CONJUNTA' && {backgroundColor: 'white', shadowOpacity: 0.1}]} onPress={() => setWalletFilter('CONJUNTA')}>
-              <Text style={{color: walletFilter === 'CONJUNTA' ? '#9333EA' : '#64748B', fontWeight: 'bold'}}>Conjunta</Text>
-            </Pressable>
-          </View>
-        )}
+
 
         <View style={styles.balanceContainer}>
           <Text style={{color: '#64748B', fontSize: 14, fontWeight: '600', textTransform: 'uppercase'}}>Balanço do Período</Text>

@@ -349,7 +349,8 @@ export default function StatisticsScreen() {
     try {
       if (pull) setRefreshing(true);
       const data = await getTransactionsByUser(user.id_usuario);
-      setTransactions(data);
+      const personalData = data.filter(t => t.id_carteira === user.id_carteira_pessoal);
+      setTransactions(personalData);
     } catch (e) {
       console.error(e);
     } finally {
