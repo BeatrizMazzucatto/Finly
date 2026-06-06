@@ -1,11 +1,22 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
+import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { TransactionModal } from '@/components/TransactionModal';
 
-// Mock do expo/vector-icons
 jest.mock('@expo/vector-icons', () => ({
   Feather: 'Feather',
 }));
+
+jest.mock('@/src/services/categories', () => ({
+  getCategories: jest.fn(),
+}));
+
+import { getCategories } from '@/src/services/categories';
+
+const mockGetCategories = getCategories as jest.MockedFunction<typeof getCategories>;
+
+const mockCategories = [
+  { id_categoria: 1, nome: 'Alimentação', cor_hex: '#F59E0B', icone: 'coffee' },
+];
 
 const mockOnClose = jest.fn();
 const mockOnSave = jest.fn();
@@ -24,11 +35,13 @@ describe('TransactionModal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockOnSave.mockResolvedValue(undefined);
+    mockGetCategories.mockResolvedValue(mockCategories);
   });
 
-  it('renderiza corretamente quando visível', () => {
+  it('renderiza corretamente quando visível', async () => {
     const { getByText } = renderModal(true);
     expect(getByText('Nova Transação')).toBeTruthy();
+    await waitFor(() => expect(mockGetCategories).toHaveBeenCalled());
   });
 
   it('não renderiza conteúdo quando invisível', () => {
@@ -55,7 +68,10 @@ describe('TransactionModal', () => {
   });
 
   it('exibe alerta de erro ao tentar salvar sem campos preenchidos', async () => {
+    mockGetCategories.mockResolvedValue([]);
     const { getByText } = renderModal();
+
+    await waitFor(() => expect(mockGetCategories).toHaveBeenCalled());
 
     await act(async () => {
       fireEvent.press(getByText('Salvar'));
@@ -66,6 +82,8 @@ describe('TransactionModal', () => {
 
   it('chama onSave com dados corretos ao preencher e salvar', async () => {
     const { getByText, getByPlaceholderText } = renderModal();
+
+    await waitFor(() => expect(mockGetCategories).toHaveBeenCalled());
 
     fireEvent.changeText(getByPlaceholderText('Ex: 150'), '100');
     fireEvent.changeText(getByPlaceholderText('Ex: Supermercado'), 'Mercado');
@@ -79,6 +97,7 @@ describe('TransactionModal', () => {
       tipo: 'DESPESA',
       valor: 100,
       categoria: 'Alimentação',
+      id_categoria: 1,
       carteira: 'PESSOAL',
     });
   });
