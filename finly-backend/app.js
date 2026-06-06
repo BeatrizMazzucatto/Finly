@@ -20,6 +20,10 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(3000, () => {
-  console.log("Servidor rodando na porta 3000");
-});
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(3000, () => {
+    console.log("Servidor rodando na porta 3000");
+  });
+}
