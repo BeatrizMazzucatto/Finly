@@ -168,4 +168,26 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/test')).rejects.toThrow('Erro na API');
   });
+
+  it('lança erro de timeout quando a requisição demora demais', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => {
+            const error = new Error('Aborted');
+            error.name = 'AbortError';
+            reject(error);
+          });
+        })
+    ) as unknown as typeof fetch;
+
+    const assertion = expect(apiRequest('/test')).rejects.toThrow(
+      'Tempo de resposta excedido. Verifique sua conexão.'
+    );
+
+    await jest.advanceTimersByTimeAsync(8000);
+    await assertion;
+    jest.useRealTimers();
+  });
 });

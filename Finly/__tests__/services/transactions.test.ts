@@ -183,6 +183,20 @@ describe('deleteTransaction', () => {
     );
   });
 
+  it('envia id_usuario no body do DELETE', async () => {
+    mockApiRequest.mockResolvedValue({ mensagem: 'Deletado' });
+
+    await deleteTransaction(7, 2);
+
+    expect(mockApiRequest).toHaveBeenCalledWith(
+      '/transacoes/7',
+      expect.objectContaining({
+        method: 'DELETE',
+        body: JSON.stringify({ id_usuario: 2 }),
+      })
+    );
+  });
+
   it('retorna mensagem de sucesso', async () => {
     mockApiRequest.mockResolvedValue({ mensagem: 'Transação removida' });
 
