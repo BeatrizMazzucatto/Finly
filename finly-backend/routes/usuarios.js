@@ -142,4 +142,24 @@ router.post("/:id/onboarding", async (req, res) => {
   }
 });
 
+// GET /usuarios/:id
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const sql = `
+      SELECT u.id_usuario, u.nome, u.email,
+        (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'PESSOAL' LIMIT 1) as id_carteira_pessoal,
+        (SELECT id_carteira FROM usuarios_carteiras uc JOIN carteiras c USING(id_carteira) WHERE uc.id_usuario = u.id_usuario AND c.tipo = 'CONJUNTA' LIMIT 1) as id_carteira_conjunta
+      FROM usuarios u
+      WHERE u.id_usuario = $1
+    `;
+    const result = await db.query(sql, [id]);
+    if (result.rowCount === 0) return res.status(404).json({ erro: "Usuário não encontrado" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Erro ao buscar usuário:", err);
+    res.status(500).json({ erro: "Erro ao buscar usuário" });
+  }
+});
+
 module.exports = router;

@@ -42,8 +42,8 @@ export function Chip({
     }
   } else {
     if (selected) {
-      backgroundColor = Colors.textPrimary;
-      borderColor = Colors.textPrimary;
+      backgroundColor = Colors.primary;
+      borderColor = Colors.primary;
       textColor = Colors.textInverse;
     } else {
       backgroundColor = Colors.surface;

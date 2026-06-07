@@ -76,7 +76,13 @@ export function useTransactionSync(userId: number | undefined, intervalMs = 5000
     if (!userId) return;
     try {
       const data = await getTransactionsByUser(userId);
-      setTransactions(data);
+      setTransactions((prev) => {
+        // Apenas atualiza se o conteúdo for diferente (evita re-render de todo o Dashboard a cada 5s)
+        if (prev.length === data.length && JSON.stringify(prev) === JSON.stringify(data)) {
+          return prev;
+        }
+        return data;
+      });
       setLastSync(new Date());
     } catch (err) {
       // Silencia erros de polling para não interromper o usuário
@@ -100,5 +106,9 @@ export function useTransactionSync(userId: number | undefined, intervalMs = 5000
     };
   }, [userId, intervalMs]);
 
-  return { transactions, loading, lastSync, refresh: fetchTransactions };
+  const mutate = (newTransactions: Transaction[]) => {
+    setTransactions(newTransactions);
+  };
+
+  return { transactions, loading, lastSync, refresh: fetchTransactions, mutate };
 }

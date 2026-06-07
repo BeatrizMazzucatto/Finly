@@ -1,9 +1,9 @@
 export const Colors = {
-  primary: "#4F46E5",
-  primaryLight: "#EEF2FF",
-  primaryDark: "#3B82F6",
-  secondary: "#3B82F6",
-  accent: "#F59E0B",
+  primary: "#103B26",
+  primaryLight: "#DEF8A1",
+  primaryDark: "#0B2B1B",
+  secondary: "#103B26",
+  accent: "#DEF8A1",
 
   background: "#F8FAFC",
   surface: "#FFFFFF",
@@ -69,18 +69,18 @@ export const Colors = {
   light: {
     text: "#1E293B",
     background: "#F8FAFC",
-    tint: "#4F46E5",
+    tint: "#103B26",
     icon: "#64748B",
     tabIconDefault: "#94A3B8",
-    tabIconSelected: "#4F46E5",
+    tabIconSelected: "#103B26",
   },
   dark: {
     text: "#F8FAFC",
     background: "#0F172A",
-    tint: "#4F46E5",
+    tint: "#103B26",
     icon: "#94A3B8",
     tabIconDefault: "#475569",
-    tabIconSelected: "#4F46E5",
+    tabIconSelected: "#103B26",
   },
 };
 

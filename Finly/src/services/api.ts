@@ -9,9 +9,6 @@ function resolveApiBaseUrl() {
     return configuredUrl;
   }
 
-  if (Platform.OS === "android") {
-    return `http://10.0.2.2:${FALLBACK_PORT}`;
-  }
 
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {

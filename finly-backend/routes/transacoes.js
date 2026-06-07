@@ -14,7 +14,7 @@ async function registrarLog(id_usuario, acao, tabela, id_registro, detalhes) {
 }
 
 // CRIAR TRANSAÇÃO
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const {
     id_carteira,
     id_usuario,
@@ -40,6 +40,24 @@ router.post("/", (req, res) => {
     return res.status(400).json({ erro: "Tipo deve ser RECEITA ou DESPESA" });
   }
 
+  // Failsafe: se a requisição vier com id_carteira=1 (fallback do frontend) mas o usuário não for 1, 
+  // buscamos a carteira pessoal real dele.
+  let targetCarteira = id_carteira;
+  if (targetCarteira === 1 && id_usuario !== 1) {
+    try {
+      const resCarteira = await pool.query(`
+        SELECT id_carteira FROM usuarios_carteiras uc
+        JOIN carteiras c USING(id_carteira)
+        WHERE uc.id_usuario = $1 AND c.tipo = 'PESSOAL' LIMIT 1
+      `, [id_usuario]);
+      if (resCarteira.rowCount > 0) {
+        targetCarteira = resCarteira.rows[0].id_carteira;
+      }
+    } catch (e) {
+      console.error("Erro no failsafe de carteira:", e);
+    }
+  }
+
   const sql = `
     INSERT INTO transacoes
     (id_carteira, id_usuario, id_categoria, titulo, descricao, tipo, valor, data_transacao, forma_pagamento, status)
@@ -50,7 +68,7 @@ router.post("/", (req, res) => {
   pool.query(
     sql,
     [
-      id_carteira,
+      targetCarteira,
       id_usuario,
       id_categoria,
       titulo,
@@ -177,7 +195,7 @@ router.put("/:id", (req, res) => {
 // EXCLUIR TRANSAÇÃO
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
-  const { id_usuario } = req.body; // Quem está excluindo (para auditoria)
+  const id_usuario = req.body ? req.body.id_usuario : undefined; // Quem está excluindo (para auditoria)
 
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ erro: "ID inválido" });

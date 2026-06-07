@@ -1,379 +1,137 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   RefreshControl,
   Pressable,
   TextInput,
-  Alert,
   StatusBar,
-  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "@/src/context/AuthContext";
-import { apiRequest } from "@/src/services/api";
-import { getTransactionsByUser } from "@/src/services/transactions";
-import type { Transaction } from "@/src/types/api";
-import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
+import { Colors, BorderRadius, FontSize, FontWeight, Spacing } from "@/constants/theme";
 import { Card, Chip, TransactionItem } from "@/components/ui";
-import { formatCurrency, getCurrentMonthYear } from "@/utils/formatters";
-import { CATEGORIAS } from "@/constants/categories";
 import { LineChart } from "react-native-gifted-charts";
+import { formatCurrency } from "@/utils/formatters";
+import { useHistoryViewModel } from "@/src/viewmodels/useHistoryViewModel";
+import type { Transaction } from "@/src/types/api";
 
 const FILTER_OPTIONS = ["Todos", "Receitas", "Despesas"];
 
+const SORT_OPTIONS = [
+  { key: "recent",  label: "Mais recentes" },
+  { key: "oldest",  label: "Mais antigas"  },
+  { key: "highest", label: "Maior valor"   },
+  { key: "lowest",  label: "Menor valor"   },
+] as const;
+
 export default function HistoryScreen() {
-  const { user } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState("Todos");
-  const [sortOrder, setSortOrder] = useState<"recent" | "oldest" | "highest" | "lowest">("recent");
-  const [showSearch, setShowSearch] = useState(false);
-  const [showSort, setShowSort] = useState(false);
+  const {
+    filteredTransactions,
+    refreshing,
+    searchQuery,
+    activeFilter,
+    sortOrder,
+    showSearch,
+    showSort,
+    monthFilters,
+    activeMonthFilter,
+    totalFiltered,
+    totalDespesas,
+    totalReceitas,
+    lineDataBalance,
+    groupedTransactions,
+    setSearchQuery,
+    setActiveFilter,
+    setSortOrder,
+    toggleSearch,
+    toggleSort,
+    navigateToPrevMonth,
+    navigateToNextMonth,
+    canGoPrevMonth,
+    canGoNextMonth,
+    loadData,
+    handleEdit,
+    handleDelete,
+    formatDateHeader,
+  } = useHistoryViewModel();
 
-  const monthFilters = useMemo(() => {
-    if (!transactions || transactions.length === 0) return [];
-    
-    const months = [
-      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ];
-    
-    const uniqueMonths = new Set<string>();
-    const list: {label: string, month: number, year: number}[] = [];
-    const currentYear = new Date().getFullYear();
-    
-    transactions.forEach(t => {
-      const parts = t.data_transacao.split("-");
-      if (parts.length >= 2) {
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1; // 0-indexed
-        const key = `${year}-${month}`;
-        
-        if (!uniqueMonths.has(key)) {
-          uniqueMonths.add(key);
-          list.push({
-            label: year === currentYear ? months[month] : `${months[month]} ${year}`,
-            month,
-            year
-          });
-        }
-      }
-    });
-    
-    // Sort ascending (chronological)
-    list.sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.month - b.month;
-    });
-    
-    return list;
-  }, [transactions]);
-
-  const [activeMonthFilter, setActiveMonthFilter] = useState<{
-    label: string;
-    month: number;
-    year: number;
-  } | null>(null);
-
-  // Selecionar o mês atual por padrão (último item)
-  useEffect(() => {
-    if (monthFilters.length > 0 && !activeMonthFilter) {
-      setActiveMonthFilter(monthFilters[monthFilters.length - 1]);
+  // FlatList: converte grupos em seções flat [ header, item, item, header, item... ]
+  const flatData = useMemo(() => {
+    const result: Array<{ type: "header"; date: string } | { type: "item"; item: Transaction }> = [];
+    for (const [date, items] of Object.entries(groupedTransactions)) {
+      result.push({ type: "header", date });
+      for (const item of items) result.push({ type: "item", item });
     }
-  }, [monthFilters]);
+    return result;
+  }, [groupedTransactions]);
 
-  async function loadData(isPullToRefresh = false) {
-    if (!user) return;
-    try {
-      if (isPullToRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const data = await getTransactionsByUser(user.id_usuario);
-      const sorted = [...data].sort(
-        (a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime()
-      );
-      setTransactions(sorted);
-      setFilteredTransactions(sorted);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  const renderRow = useCallback(({ item: row }: { item: typeof flatData[number] }) => {
+    if (row.type === "header") {
+      return <Text style={styles.dateHeader}>{formatDateHeader(row.date)}</Text>;
     }
-  }
+    const t = row.item;
+    return (
+      <TransactionItem
+        id={t.id_transacao}
+        id_carteira={t.id_carteira}
+        usuario_nome={t.usuario_nome}
+        titulo={t.titulo}
+        valor={Number(t.valor)}
+        tipo={t.tipo}
+        categoria={t.categoria ?? "Outros"}
+        data={t.data_transacao}
+        showActions
+        onEdit={() => handleEdit(t)}
+        onDelete={() => handleDelete(t)}
+        style={styles.transactionItem}
+      />
+    );
+  }, [formatDateHeader, handleEdit, handleDelete]);
 
-  useEffect(() => {
-    loadData();
-  }, [user?.id_usuario]);
+  const keyExtractor = useCallback((row: typeof flatData[number], idx: number) =>
+    row.type === "header" ? `h-${row.date}` : `t-${row.item.id_transacao}-${idx}`, []);
 
-  // Filtrar e ordenar transações
-  useEffect(() => {
-    let filtered = [...transactions];
-
-    // Filtro por tipo/conjunta
-    if (activeFilter === "Conjuntas") {
-      filtered = filtered.filter((t) => t.id_carteira === (user?.id_carteira_conjunta || 3));
-    } else {
-      // Remove a carteira conjunta do histórico pessoal
-      filtered = filtered.filter((t) => t.id_carteira !== (user?.id_carteira_conjunta || 3));
-
-      if (activeFilter === "Receitas") {
-        filtered = filtered.filter((t) => t.tipo === "RECEITA");
-      } else if (activeFilter === "Despesas") {
-        filtered = filtered.filter((t) => t.tipo === "DESPESA");
-      }
-    }
-
-    // Filtro por mês/ano
-    if (activeMonthFilter) {
-      filtered = filtered.filter((t) => {
-        const parts = t.data_transacao.split("-");
-        if (parts.length >= 2) {
-          const year = parseInt(parts[0], 10);
-          const month = parseInt(parts[1], 10) - 1; // 0-indexed
-          return year === activeMonthFilter.year && month === activeMonthFilter.month;
-        }
-        return false;
-      });
-    }
-
-    // Filtro por busca
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (t) =>
-          t.titulo.toLowerCase().includes(query) ||
-          (t.categoria?.toLowerCase().includes(query) ?? false)
-      );
-    }
-
-    // Ordenação
-    switch (sortOrder) {
-      case "oldest":
-        filtered.sort((a, b) => new Date(a.data_transacao).getTime() - new Date(b.data_transacao).getTime());
-        break;
-      case "highest":
-        filtered.sort((a, b) => Number(b.valor) - Number(a.valor));
-        break;
-      case "lowest":
-        filtered.sort((a, b) => Number(a.valor) - Number(b.valor));
-        break;
-      default:
-        filtered.sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime());
-    }
-
-    setFilteredTransactions(filtered);
-  }, [transactions, activeFilter, activeMonthFilter, searchQuery, sortOrder]);
-
-  const totalFiltered = useMemo(
-    () => filteredTransactions.reduce((a, t) => a + (t.tipo === "DESPESA" ? -Number(t.valor) : Number(t.valor)), 0),
-    [filteredTransactions]
-  );
-
-  const totalDespesas = useMemo(
-    () => filteredTransactions.filter((t) => t.tipo === "DESPESA").reduce((a, t) => a + Number(t.valor), 0),
-    [filteredTransactions]
-  );
-
-  const totalReceitas = useMemo(
-    () => filteredTransactions.filter((t) => t.tipo === "RECEITA").reduce((a, t) => a + Number(t.valor), 0),
-    [filteredTransactions]
-  );
-
-  const { lineData, lineData2 } = useMemo(() => {
-    const isTodos = activeFilter === "Todos";
-    const isReceita = activeFilter === "Receitas";
-
-    const grouped1: Record<string, number> = {};
-    const grouped2: Record<string, number> = {};
-
-    [...filteredTransactions]
-      .sort((a, b) => new Date(a.data_transacao).getTime() - new Date(b.data_transacao).getTime())
-      .forEach((t) => {
-        const d = t.data_transacao;
-        if (isTodos) {
-          if (t.tipo === "DESPESA") grouped1[d] = (grouped1[d] || 0) + Number(t.valor);
-          if (t.tipo === "RECEITA") grouped2[d] = (grouped2[d] || 0) + Number(t.valor);
-        } else if (isReceita) {
-          if (t.tipo === "RECEITA") grouped1[d] = (grouped1[d] || 0) + Number(t.valor);
-        } else {
-          if (t.tipo === "DESPESA") grouped1[d] = (grouped1[d] || 0) + Number(t.valor);
-        }
-      });
-
-    const formatData = (grouped: Record<string, number>) => {
-      const entries = Object.entries(grouped).filter(([_, val]) => val > 0);
-      let data = entries.map(([date, val]) => ({
-        value: val,
-        label: date.split("-")[2],
-      }));
-      if (data.length === 0) return [];
-      if (data.length === 1) data = [{ value: 0, label: "" }, data[0]];
-      return data;
-    };
-
-    return {
-      lineData: formatData(grouped1),
-      lineData2: isTodos ? formatData(grouped2) : []
-    };
-  }, [filteredTransactions, activeFilter]);
-
-  const lineDataBalance = useMemo(() => {
-    if (activeFilter !== "Todos") return [];
-    
-    const grouped: Record<string, number> = {};
-    [...filteredTransactions]
-      .sort((a, b) => new Date(a.data_transacao).getTime() - new Date(b.data_transacao).getTime())
-      .forEach((t) => {
-        const d = t.data_transacao;
-        const val = t.tipo === "RECEITA" ? Number(t.valor) : -Number(t.valor);
-        grouped[d] = (grouped[d] || 0) + val;
-      });
-
-    const entries = Object.entries(grouped);
-    let data = entries.map(([date, val]) => ({
-      value: val,
-      label: date.split("-")[2],
-    }));
-
-    if (data.length === 0) return [];
-    if (data.length === 1) data = [{ value: 0, label: "" }, data[0]];
-    return data;
-  }, [filteredTransactions, activeFilter]);
-
-  // Agrupar por data
-  const groupedTransactions = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {};
-    filteredTransactions.forEach((t) => {
-      const date = t.data_transacao;
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(t);
-    });
-    return groups;
-  }, [filteredTransactions]);
-
-  function handleEdit(item: Transaction) {
-    router.push({
-      pathname: "/transaction-form",
-      params: {
-        id_transacao: String(item.id_transacao),
-        titulo: item.titulo,
-        valor: String(item.valor),
-        tipo: item.tipo,
-        categoria_nome: item.categoria ?? "",
-        data_transacao: item.data_transacao,
-        id_carteira: String(item.id_carteira ?? 1),
-      },
-    });
-  }
-
-  function handleDelete(item: Transaction) {
-    const doDelete = async () => {
-      try {
-        await apiRequest(`/transacoes/${item.id_transacao}`, { method: "DELETE" });
-        await loadData();
-      } catch (err) {
-        if (Platform.OS === "web") {
-          alert("Erro: " + (err instanceof Error ? err.message : "Não foi possível excluir."));
-        } else {
-          Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível excluir.");
-        }
-      }
-    };
-
-    if (Platform.OS === "web") {
-      if (window.confirm(`Excluir transação\n\nDeseja excluir "${item.titulo}"?`)) {
-        doDelete();
-      }
-    } else {
-      Alert.alert(
-        "Excluir transação",
-        `Deseja excluir "${item.titulo}"?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Excluir", style: "destructive", onPress: doDelete },
-        ]
-      );
-    }
-  }
-
-  function formatDateHeader(dateStr: string): string {
-    const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (dateStr === today.toISOString().split("T")[0]) return "Hoje";
-    if (dateStr === yesterday.toISOString().split("T")[0]) return "Ontem";
-
-    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
-  }
-
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />}
-      showsVerticalScrollIndicator={false}
-    >
+  // Header da FlatList (tudo acima da lista de transações)
+  const ListHeader = useMemo(() => (
+    <>
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Histórico</Text>
         <View style={{ flexDirection: "row", gap: 12 }}>
-          <Pressable onPress={() => { setShowSort(!showSort); setShowSearch(false); }} style={styles.searchToggleBtn}>
+          <Pressable onPress={toggleSort} style={styles.iconBtn}>
             <Feather name="sliders" size={22} color={Colors.textPrimary} />
           </Pressable>
-          <Pressable onPress={() => { setShowSearch(!showSearch); setShowSort(false); }} style={styles.searchToggleBtn}>
+          <Pressable onPress={toggleSearch} style={styles.iconBtn}>
             <Feather name="search" size={22} color={Colors.textPrimary} />
           </Pressable>
         </View>
       </View>
 
-      {/* Sort Menu Dropdown */}
+      {/* Sort Dropdown */}
       {showSort && (
         <View style={styles.sortDropdown}>
           <Text style={styles.sortDropdownTitle}>Ordenar transações por</Text>
-          {[
-            { key: "recent", label: "Mais recentes" },
-            { key: "oldest", label: "Mais antigas" },
-            { key: "highest", label: "Maior valor" },
-            { key: "lowest", label: "Menor valor" },
-          ].map((option, index, arr) => (
+          {SORT_OPTIONS.map((opt, idx) => (
             <Pressable
-              key={option.key}
-              style={[
-                styles.sortDropdownItem,
-                index === arr.length - 1 && { borderBottomWidth: 0 }
-              ]}
-              onPress={() => {
-                setSortOrder(option.key as any);
-                setShowSort(false);
-              }}
+              key={opt.key}
+              style={[styles.sortDropdownItem, idx === SORT_OPTIONS.length - 1 && { borderBottomWidth: 0 }]}
+              onPress={() => setSortOrder(opt.key)}
             >
-              <Text style={[
-                styles.sortDropdownText,
-                sortOrder === option.key && { color: Colors.primary, fontWeight: 'bold' }
-              ]}>
-                {option.label}
+              <Text style={[styles.sortDropdownText, sortOrder === opt.key && { color: Colors.primary, fontWeight: "bold" }]}>
+                {opt.label}
               </Text>
-              {sortOrder === option.key && <Feather name="check" size={18} color={Colors.primary} />}
+              {sortOrder === opt.key && <Feather name="check" size={18} color={Colors.primary} />}
             </Pressable>
           ))}
         </View>
       )}
 
-      {/* Search Input (hidden by default) */}
+      {/* Search */}
       {showSearch && (
         <View style={styles.searchContainer}>
           <Feather name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
@@ -393,363 +151,136 @@ export default function HistoryScreen() {
         </View>
       )}
 
-      {/* Filters (Type Row) */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtersScroll}
-        contentContainerStyle={styles.filtersContent}
-      >
-        {FILTER_OPTIONS.map((filter) => {
-          const isConjuntas = filter === "Conjuntas";
-          return (
-            <Chip
-              key={filter}
-              label={filter}
-              selected={activeFilter === filter}
-              onPress={() => setActiveFilter(filter)}
-              color={isConjuntas ? Colors.jointPrimary : Colors.primary}
-              icon={isConjuntas ? "users" : undefined}
-            />
-          );
-        })}
-      </ScrollView>
+      {/* Filtros de tipo */}
+      <View style={styles.filtersRow}>
+        {FILTER_OPTIONS.map(f => (
+          <Chip key={f} label={f} selected={activeFilter === f} onPress={() => setActiveFilter(f)} color={Colors.primary} />
+        ))}
+      </View>
 
-      {/* Month Selector */}
+      {/* Seletor de mês */}
       {monthFilters.length > 0 && activeMonthFilter && (
         <View style={styles.monthSelector}>
-          <Pressable 
-            style={styles.monthArrow} 
-            onPress={() => {
-              const currentIndex = monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year);
-              if (currentIndex > 0) setActiveMonthFilter(monthFilters[currentIndex - 1]);
-            }}
-          >
-            <Feather name="chevron-left" size={24} color={
-              monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year) > 0 
-                ? Colors.textPrimary : Colors.textMuted
-            } />
+          <Pressable style={styles.monthArrow} onPress={navigateToPrevMonth}>
+            <Feather name="chevron-left" size={24} color={canGoPrevMonth() ? Colors.textPrimary : Colors.textMuted} />
           </Pressable>
-          
           <Text style={styles.monthLabel}>{activeMonthFilter.label}</Text>
-          
-          <Pressable 
-            style={styles.monthArrow}
-            onPress={() => {
-              const currentIndex = monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year);
-              if (currentIndex < monthFilters.length - 1) setActiveMonthFilter(monthFilters[currentIndex + 1]);
-            }}
-          >
-            <Feather name="chevron-right" size={24} color={
-              monthFilters.findIndex(m => m.month === activeMonthFilter.month && m.year === activeMonthFilter.year) < monthFilters.length - 1 
-                ? Colors.textPrimary : Colors.textMuted
-            } />
+          <Pressable style={styles.monthArrow} onPress={navigateToNextMonth}>
+            <Feather name="chevron-right" size={24} color={canGoNextMonth() ? Colors.textPrimary : Colors.textMuted} />
           </Pressable>
         </View>
       )}
 
-      {/* Summary Card */}
+      {/* Resumo */}
       <Card style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Receitas</Text>
-            <Text style={[styles.summaryValue, { color: Colors.income }]}>
-              +{formatCurrency(totalReceitas)}
-            </Text>
+            <Text style={[styles.summaryValue, { color: Colors.income }]}>+{formatCurrency(totalReceitas)}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Despesas</Text>
-            <Text style={[styles.summaryValue, { color: Colors.expense }]}>
-              -{formatCurrency(totalDespesas)}
-            </Text>
+            <Text style={[styles.summaryValue, { color: Colors.expense }]}>-{formatCurrency(totalDespesas)}</Text>
           </View>
         </View>
         <View style={styles.summaryTotal}>
-          <Text style={styles.summaryTotalLabel}>
-            Lucro
-          </Text>
-          <Text style={[
-            styles.summaryTotalValue,
-            { color: totalFiltered >= 0 ? Colors.income : Colors.expense },
-          ]}>
+          <Text style={styles.summaryTotalLabel}>Lucro</Text>
+          <Text style={[styles.summaryTotalValue, { color: totalFiltered >= 0 ? Colors.income : Colors.expense }]}>
             {formatCurrency(Math.abs(totalFiltered))}
           </Text>
         </View>
       </Card>
 
-
-      {/* Net Balance Chart */}
+      {/* Gráfico saldo */}
       {activeFilter === "Todos" && lineDataBalance.length > 0 && (
         <Card style={styles.summaryCard}>
-          <Text style={{fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 12}}>
-            Saldo
-          </Text>
-          <View style={{ alignItems: 'center' }}>
+          <Text style={{ fontSize: 14, fontWeight: "bold", color: Colors.textPrimary, marginBottom: 12 }}>Saldo</Text>
+          <View style={{ alignItems: "center" }}>
             <LineChart
               data={lineDataBalance}
-              areaChart
-              hideDataPoints
-              startFillColor={Colors.primary}
-              startOpacity={0.3}
-              endFillColor={Colors.primary}
-              endOpacity={0.02}
-              color={Colors.primary}
-              thickness={2}
-              xAxisThickness={0}
-              yAxisThickness={0}
-              hideYAxisText
-              hideRules
-              curved
-              height={100}
-              width={250}
+              areaChart hideDataPoints
+              startFillColor={Colors.primary} startOpacity={0.3}
+              endFillColor={Colors.primary}   endOpacity={0.02}
+              color={Colors.primary} thickness={2}
+              xAxisThickness={0} yAxisThickness={0}
+              hideYAxisText hideRules curved height={100} width={250}
             />
           </View>
         </Card>
       )}
+    </>
+  ), [showSort, showSearch, sortOrder, searchQuery, activeFilter, activeMonthFilter,
+      monthFilters, totalReceitas, totalDespesas, totalFiltered, lineDataBalance,
+      toggleSort, toggleSearch, setSortOrder, setSearchQuery, setActiveFilter,
+      navigateToPrevMonth, navigateToNextMonth, canGoPrevMonth, canGoNextMonth]);
 
-
-
-
-      {/* Transactions List */}
-      {filteredTransactions.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <Feather name="inbox" size={48} color={Colors.textMuted} />
-          <Text style={styles.emptyTitle}>Nenhuma transação encontrada</Text>
-          <Text style={styles.emptySubtitle}>
-            {searchQuery || activeFilter !== "Todos"
-              ? "Tente ajustar seus filtros"
-              : "Comece adicionando sua primeira transação"}
-          </Text>
-          {!searchQuery && activeFilter === "Todos" && (
-            <Pressable style={styles.emptyButton} onPress={() => router.push("/transaction-form")}>
-              <Feather name="plus" size={18} color={Colors.textInverse} />
-              <Text style={styles.emptyButtonText}>Adicionar transação</Text>
-            </Pressable>
-          )}
-        </Card>
-      ) : (
-        Object.entries(groupedTransactions).map(([date, items]) => (
-          <View key={date} style={styles.dateGroup}>
-            <Text style={styles.dateHeader}>{formatDateHeader(date)}</Text>
-            <View style={styles.transactionsList}>
-              {items.map((item) => (
-                <TransactionItem
-                  key={item.id_transacao}
-                  id={item.id_transacao}
-                  id_carteira={item.id_carteira}
-                  usuario_nome={item.usuario_nome}
-                  titulo={item.titulo}
-                  valor={Number(item.valor)}
-                  tipo={item.tipo}
-                  categoria={item.categoria ?? "Outros"}
-                  data={item.data_transacao}
-                  showActions
-                  onEdit={() => handleEdit(item)}
-                  onDelete={() => handleDelete(item)}
-                />
-              ))}
-            </View>
-          </View>
-        ))
+  const ListEmpty = useMemo(() => (
+    <Card style={styles.emptyCard}>
+      <Feather name="inbox" size={48} color={Colors.textMuted} />
+      <Text style={styles.emptyTitle}>Nenhuma transação encontrada</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery || activeFilter !== "Todos" ? "Tente ajustar seus filtros" : "Comece adicionando sua primeira transação"}
+      </Text>
+      {!searchQuery && activeFilter === "Todos" && (
+        <Pressable style={styles.emptyButton} onPress={() => router.push("/transaction-form")}>
+          <Feather name="plus" size={18} color={Colors.textInverse} />
+          <Text style={styles.emptyButtonText}>Adicionar transação</Text>
+        </Pressable>
       )}
-    </ScrollView>
+    </Card>
+  ), [searchQuery, activeFilter]);
+
+  return (
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      data={flatData}
+      keyExtractor={keyExtractor}
+      renderItem={renderRow}
+      ListHeaderComponent={ListHeader}
+      ListEmptyComponent={ListEmpty}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />}
+      showsVerticalScrollIndicator={false}
+      removeClippedSubviews
+      maxToRenderPerBatch={12}
+      windowSize={5}
+      initialNumToRender={15}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    padding: Spacing.xl,
-    paddingTop: 50,
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.lg,
-  },
-  searchToggleBtn: {
-    padding: Spacing.xs,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    marginTop: Spacing.xs,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F1F5F9",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    borderWidth: 0,
-    marginBottom: Spacing.md,
-  },
-  searchIcon: {
-    marginRight: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 14,
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-  },
-  filtersScroll: {
-    marginBottom: Spacing.lg,
-  },
-  filtersContent: {
-    gap: Spacing.sm,
-    paddingRight: Spacing.lg,
-  },
-  summaryCard: {
-    marginBottom: Spacing.lg,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    marginBottom: Spacing.md,
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: Spacing.lg,
-  },
-  summaryLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    marginBottom: Spacing.xs,
-  },
-  summaryValue: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-  },
-  summaryTotal: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  summaryTotalLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-  summaryTotalValue: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-  },
-  monthSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.surface,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.full,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  monthArrow: {
-    padding: Spacing.xs,
-  },
-  monthLabel: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    textTransform: "capitalize",
-  },
-  sortDropdown: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sortDropdownTitle: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sortDropdownItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  sortDropdownText: {
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-  },
-  dateGroup: {
-    marginBottom: Spacing.xl,
-  },
-  dateHeader: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  transactionsList: {
-    gap: Spacing.sm,
-  },
-  emptyCard: {
-    alignItems: "center",
-    paddingVertical: Spacing.xxl,
-    gap: Spacing.sm,
-  },
-  emptyTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    color: Colors.textPrimary,
-  },
-  emptySubtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-    textAlign: "center",
-  },
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.md,
-  },
-  emptyButtonText: {
-    color: Colors.textInverse,
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.xl, paddingTop: 50, paddingBottom: 100 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.lg },
+  iconBtn: { padding: Spacing.xs, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 16, paddingHorizontal: 16, marginBottom: Spacing.md },
+  searchIcon: { marginRight: Spacing.sm },
+  searchInput: { flex: 1, paddingVertical: 14, fontSize: FontSize.md, color: Colors.textPrimary },
+  filtersRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg, flexWrap: "wrap" },
+  summaryCard: { marginBottom: Spacing.lg },
+  summaryRow: { flexDirection: "row", marginBottom: Spacing.md },
+  summaryItem: { flex: 1, alignItems: "center" },
+  summaryDivider: { width: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.lg },
+  summaryLabel: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
+  summaryValue: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  summaryTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
+  summaryTotalLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  summaryTotalValue: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  monthSelector: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surface, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.full, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
+  monthArrow: { padding: Spacing.xs },
+  monthLabel: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, textTransform: "capitalize" },
+  sortDropdown: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  sortDropdownTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textSecondary, marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
+  sortDropdownItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  sortDropdownText: { fontSize: FontSize.md, color: Colors.textPrimary },
+  dateHeader: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textSecondary, marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5, marginTop: Spacing.md },
+  transactionItem: { marginBottom: Spacing.sm },
+  emptyCard: { alignItems: "center", paddingVertical: Spacing.xxl, gap: Spacing.sm },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
+  emptySubtitle: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: "center" },
+  emptyButton: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, backgroundColor: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderRadius: BorderRadius.md, marginTop: Spacing.md },
+  emptyButtonText: { color: Colors.textInverse, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
 });

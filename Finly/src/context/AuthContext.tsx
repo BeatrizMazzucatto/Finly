@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { login as loginService } from "@/src/services/auth";
-import type { User } from "@/src/types/api";
+import { User } from "../types/api";
+import { API_BASE_URL } from "@/src/services/api";
 
 const AUTH_STORAGE_KEY = "finly_auth_user";
 
@@ -28,18 +29,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function restoreSession() {
-  try {
-    const cachedUser = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+      try {
+        const cachedUser = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+        if (cachedUser) {
+          const parsedUser = JSON.parse(cachedUser) as User;
+          setUser(parsedUser);
 
-    if (cachedUser) {
-      setUser(JSON.parse(cachedUser) as User);
+          // Force sync with server if it's a real user
+          if (parsedUser.id_usuario !== 1) {
+            try {
+              const res = await fetch(`${API_BASE_URL}/usuarios/${parsedUser.id_usuario}`);
+              if (res.ok) {
+                const freshUser = await res.json();
+                setUser(freshUser);
+                await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(freshUser));
+              }
+            } catch (error) {
+              console.error("Erro ao sincronizar usuário:", error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao restaurar sessão:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-  } catch (error) {
-    console.error("Erro ao restaurar sessão:", error);
-  } finally {
-    setLoading(false);
-  }
-}
     restoreSession();
   }, []);
 

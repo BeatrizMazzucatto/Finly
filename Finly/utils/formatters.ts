@@ -22,6 +22,14 @@ export function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** Retorna apenas dia/mês: "07/06" */
+export function formatDateMD(dateStr: string): string {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return dateStr;
+  return `${parts[2]}/${parts[1]}`;
+}
+
 export function formatDateShort(dateStr: string): string {
   if (!dateStr) return "";
   const [year, month, day] = dateStr.split("-");
@@ -59,7 +67,10 @@ export function getCurrentMonthYear(): string {
 }
 
 export function parseMoneyInput(text: string): number {
-  const clean = text.replace(/[^0-9,\.]/g, "").replace(",", ".");
+  // text comes in format like "1.234,56"
+  let clean = text.replace(/\./g, ""); // Remove thousands separator: "1234,56"
+  clean = clean.replace(",", ".");     // Convert decimal separator: "1234.56"
+  clean = clean.replace(/[^0-9.]/g, ""); // Keep only numbers and the decimal point
   return parseFloat(clean) || 0;
 }
 

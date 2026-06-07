@@ -1,15 +1,15 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { getCategoryIcon, getCategoryColor } from '@/constants/categories';
+import { formatCurrency } from '@/utils/formatters';
 
 type CategoryCardProps = {
   category: string;
   value: number;
-  formatCurrency: (value: number) => string;
 };
 
-export function CategoryCard({ category, value, formatCurrency }: CategoryCardProps) {
+export const CategoryCard = memo(function CategoryCard({ category, value }: CategoryCardProps) {
   const iconName = getCategoryIcon(category);
   const color = getCategoryColor(category);
 
@@ -24,7 +24,7 @@ export function CategoryCard({ category, value, formatCurrency }: CategoryCardPr
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   catCard: { 

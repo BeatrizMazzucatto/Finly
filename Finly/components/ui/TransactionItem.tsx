@@ -1,5 +1,5 @@
-import React from "react";
-import { StyleSheet, View, Text, TouchableOpacity, ViewStyle, Image } from "react-native";
+import React, { memo } from "react";
+import { StyleSheet, View, Text, Pressable, ViewStyle, Image } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
   Colors,
@@ -28,7 +28,7 @@ interface TransactionItemProps {
   style?: ViewStyle;
 }
 
-export function TransactionItem({
+export const TransactionItem = memo(function TransactionItem({
   id,
   id_carteira,
   usuario_nome,
@@ -46,19 +46,17 @@ export function TransactionItem({
   const isExpense = tipo === "DESPESA";
   const iconName = getCategoryIcon(categoria);
   const categoryColor = getCategoryColor(categoria);
-  
+
   const isJoint = id_carteira === 3;
   const iconBgColor = isJoint ? Colors.jointLight : (categoryColor + "20");
   const iconColor = isJoint ? Colors.jointPrimary : categoryColor;
 
   const content = (
     <View style={[styles.container, style]}>
-      {/* Ícone da categoria */}
       <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
         <Feather name={isJoint ? "shopping-cart" : iconName} size={20} color={iconColor} />
       </View>
 
-      {/* Info */}
       <View style={styles.info}>
         <View style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={1}>{titulo}</Text>
@@ -81,25 +79,23 @@ export function TransactionItem({
         </View>
       </View>
 
-      {/* Valor */}
       <View style={styles.valueContainer}>
         <Text style={[styles.value, { color: isExpense ? Colors.textPrimary : Colors.success }]}>
           {isExpense ? "- " : "+ "}{formatCurrency(valor)}
         </Text>
       </View>
 
-      {/* Ações */}
       {showActions && (
         <View style={styles.actions}>
           {onEdit && (
-            <TouchableOpacity style={styles.actionBtn} onPress={onEdit}>
+            <Pressable style={styles.actionBtn} onPress={onEdit}>
               <Feather name="edit-2" size={16} color={Colors.textMuted} />
-            </TouchableOpacity>
+            </Pressable>
           )}
           {onDelete && (
-            <TouchableOpacity style={styles.actionBtn} onPress={onDelete}>
+            <Pressable style={styles.actionBtn} onPress={onDelete}>
               <Feather name="trash-2" size={16} color={Colors.error} />
-            </TouchableOpacity>
+            </Pressable>
           )}
         </View>
       )}
@@ -108,14 +104,14 @@ export function TransactionItem({
 
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <Pressable onPress={onPress} android_ripple={{ color: Colors.borderLight }}>
         {content}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
   return content;
-}
+});
 
 const styles = StyleSheet.create({
   container: {
