@@ -18,17 +18,17 @@
 
 ## 📋 Sobre o Projeto
 
-O **Finly** é um aplicativo mobile de controle financeiro pessoal desenvolvido com **React Native (Expo)** no frontend e **Node.js/Express** no backend. Permite que o usuário acompanhe receitas, despesas, carteiras individuais e conjuntas com uma interface moderna e intuitiva.
+O **Finly** é um aplicativo mobile de controle financeiro pessoal desenvolvido com **React Native (Expo)** no frontend e **Node.js/Express** no backend. O projeto foi estruturado seguindo a arquitetura **MVVM (Model-View-ViewModel)**, garantindo uma separação limpa e escalável entre a interface de usuário (UI), a lógica de negócios e o gerenciamento de estado.
 
 ### 🎯 Objetivo
 
-Fornecer uma solução completa e acessível para gestão das finanças pessoais, com suporte a:
+Fornecer uma solução robusta, leve e acessível para gestão das finanças pessoais, com suporte a:
 
 - 📊 Dashboard com visão geral do saldo e gastos por categoria
-- 💳 Múltiplas carteiras, incluindo carteiras conjuntas
-- 💸 Registro de receitas e despesas com categorias
+- 💳 Múltiplas carteiras, incluindo carteiras conjuntas sincronizadas em tempo real
+- 💸 Registro de receitas e despesas com gerenciamento dinâmico de categorias
 - 📈 Estatísticas e gráficos detalhados
-- 🔐 Autenticação e sessão persistente
+- 🔐 Autenticação, sessão persistente e componentes nativos otimizados
 
 ---
 
@@ -147,10 +147,10 @@ cd finly
 Crie um arquivo `.env` na pasta `Finly/`:
 
 ```env
-EXPO_PUBLIC_API_URL=http://localhost:3000
+EXPO_PUBLIC_API_URL=http://<SEU_IP_LOCAL>:3000
 ```
 
-> ⚠️ No Android com emulador, use `http://10.0.2.2:3000` no lugar de `localhost`.
+> ⚠️ **Dica para rodar no Celular Físico:** Para rodar o app no seu celular usando o **Expo Go**, certifique-se de que o computador e o celular estão no mesmo Wi-Fi. O backend já está configurado para ouvir conexões externas (`0.0.0.0`). Substitua `<SEU_IP_LOCAL>` pelo IP da sua máquina na rede (ex: `192.168.0.x`).
 
 ### 3️⃣ Instale as dependências e rode o projeto
 
@@ -204,35 +204,35 @@ Escolha a plataforma no menu do Expo:
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do Projeto (Arquitetura MVVM)
 
 ```
 Finly/
 ├── 📂 Finly/                        # Frontend React Native
-│   ├── app/
-│   │   ├── (tabs)/
-│   │   │   ├── index.tsx            # Dashboard
-│   │   │   ├── history.tsx          # Histórico de transações
-│   │   │   ├── statistics.tsx       # Estatísticas e gráficos
-│   │   │   ├── groups.tsx           # Carteira conjunta
-│   │   │   └── settings.tsx         # Configurações
+│   ├── app/                         # Rotas e Views (UI)
+│   │   ├── (tabs)/                  # Telas principais (Dashboard, Histórico, etc.)
 │   │   ├── login.tsx                # Tela de login
 │   │   ├── onboarding.tsx           # Onboarding inicial
 │   │   └── transaction-form.tsx     # Formulário de transação
-│   ├── components/
-│   │   ├── ui/                      # Componentes base (Button, Input, Chip...)
-│   │   ├── CategoryCard.tsx
+│   ├── components/                  # Componentes Visuais Isolados
+│   │   ├── ui/                      # Base (Button, Input, Avatar Nativo)
+│   │   ├── CategoryManagerModal.tsx # Modal de Gerenciamento de Categorias
 │   │   └── TransactionModal.tsx
 │   ├── src/
-│   │   ├── context/AuthContext.tsx
-│   │   ├── services/                # Chamadas de API
-│   │   └── types/                   # Interfaces TypeScript
-│   └── constants/                   # Cores, espaçamentos, categorias
+│   │   ├── viewmodels/              # Lógica de Negócios e Estado (MVVM)
+│   │   │   ├── useDashboardViewModel.ts
+│   │   │   ├── useHistoryViewModel.ts
+│   │   │   ├── useGroupsViewModel.ts
+│   │   │   └── useSettingsViewModel.ts
+│   │   ├── models/                  # Tipagens e Interfaces de Dados
+│   │   ├── services/                # Configuração do Axios e Rotas API
+│   │   └── context/                 # Contextos globais (AuthContext)
+│   └── constants/                   # Cores, espaçamentos, categorias padrão
 │
 └── 📂 finly-backend/                # Backend Node.js
-    ├── app.js
+    ├── app.js                       # Servidor (0.0.0.0 para acesso mobile)
     ├── database/connection.js
-    └── routes/
+    └── routes/                      # Endpoints da API REST
         ├── usuarios.js
         ├── transacoes.js
         ├── categorias.js
