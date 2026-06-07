@@ -5,20 +5,18 @@ export interface Category {
   nome: string;
   cor_hex: string;
   icone: string;
-  id_carteira?: number | null;
 }
 
-
-export async function getCategories(id_carteira?: number | null): Promise<Category[]> {
-  const url = id_carteira ? `/categorias/${id_carteira}` : "/categorias";
-  return apiRequest<Category[]>(url);
+export async function getCategories(carteiras: (number | null)[] = []): Promise<Category[]> {
+  const query = carteiras.filter(Boolean).join(",");
+  return apiRequest<Category[]>(`/categorias${query ? `?carteiras=${query}` : ""}`);
 }
 
 export async function createCategory(payload: {
   nome: string;
   icone: string;
   cor_hex: string;
-  id_carteira?: number | null;
+  id_carteira?: number;
 }): Promise<Category> {
   return apiRequest<Category>("/categorias", {
     method: "POST",
@@ -26,11 +24,10 @@ export async function createCategory(payload: {
   });
 }
 
-export async function editCategory(id: number, payload: {
-  nome: string;
-  icone: string;
-  cor_hex: string;
-}): Promise<Category> {
+export async function updateCategory(
+  id: number,
+  payload: { nome: string; icone: string; cor_hex: string }
+): Promise<Category> {
   return apiRequest<Category>(`/categorias/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),

@@ -1,8 +1,6 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,36 +10,13 @@ import {
   TextInput,
   View,
   StatusBar,
-  Switch,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useAuth } from "@/src/context/AuthContext";
-import { apiRequest } from "@/src/services/api";
-import { getCategories } from "@/src/services/categories";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing, Shadow } from "@/constants/theme";
-import { formatMoneyInput, parseMoneyInput } from "@/utils/formatters";
-
-const CARTEIRA_KEY = "finly_id_carteira";
-
-interface Categoria {
-  id_categoria: number;
-  nome: string;
-  cor_hex: string;
-  icone: string;
-}
-
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") {
-    alert(`${title}: ${message}`);
-  } else {
-    Alert.alert(title, message);
-  }
-}
+import { useTransactionFormViewModel } from "@/src/viewmodels/useTransactionFormViewModel";
 
 export default function TransactionFormScreen() {
-  const { user } = useAuth();
   const params = useLocalSearchParams<{
     id_transacao?: string;
     titulo?: string;
@@ -51,151 +26,23 @@ export default function TransactionFormScreen() {
     id_categoria?: string;
     data_transacao?: string;
     id_carteira?: string;
+    carteira?: string;
   }>();
 
-  const isEditing = !!params.id_transacao;
+  const {
+    isEditing,
+    isConjunta,
+    titulo, setTitulo,
+    valor, handleValorChange,
+    tipo, setTipo,
+    idCategoria, handleSelectCategoria,
+    data, handleDataChange,
+    categorias, loadingCats,
+    saving, errors,
+    handleSalvar, dismiss,
+    selectedCategory
+  } = useTransactionFormViewModel(params);
 
-  const [titulo, setTitulo] = useState(params.titulo ?? "");
-  const [valor, setValor] = useState(params.valor ?? "");
-  const [tipo, setTipo] = useState<"RECEITA" | "DESPESA">(
-    (params.tipo as "RECEITA" | "DESPESA") ?? "DESPESA"
-  );
-  const [idCategoria, setIdCategoria] = useState<number | null>(
-    params.id_categoria ? Number(params.id_categoria) : null
-  );
-  const [data, setData] = useState(
-    params.data_transacao ?? new Date().toISOString().split("T")[0]
-  );
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [loadingCats, setLoadingCats] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isConjunta, setIsConjunta] = useState(false);
-
-  const dismiss = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
-    }
-  };
-
-  useEffect(() => {
-    if (params.id_carteira) {
-      setIsConjunta(Number(params.id_carteira) === user?.id_carteira_conjunta);
-    } else {
-      AsyncStorage.getItem(CARTEIRA_KEY).then((val) => {
-        if (val) {
-          setIsConjunta(Number(val) === user?.id_carteira_conjunta);
-        }
-      });
-    }
-  }, [params.id_carteira, user?.id_carteira_conjunta]);
-
-  function handleValorChange(text: string) {
-    setValor(formatMoneyInput(text));
-  }
-
-  function handleDataChange(text: string) {
-    const digits = text.replace(/\D/g, "");
-    if (digits.length <= 8) {
-      let formatted = digits;
-      if (digits.length > 4) {
-        formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-      } else if (digits.length > 2) {
-        formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-      }
-      setData(formatted);
-    }
-  }
-
-  function parseDataToISO(input: string): string | null {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
-    const parts = input.split("/");
-    if (parts.length === 3 && parts[2].length === 4) {
-      return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-    }
-    return null;
-  }
-
-  async function loadCategorias() {
-    setLoadingCats(true);
-    try {
-      const carteiraId = isConjunta ? user?.id_carteira_conjunta : user?.id_carteira_pessoal;
-      const loaded = await getCategories(carteiraId);
-      setCategorias(loaded);
-    } catch {
-      setCategorias([]);
-    }
-    setLoadingCats(false);
-  }
-
-  useEffect(() => {
-    loadCategorias();
-  }, [isConjunta]);
-
-  useEffect(() => {
-    if (!idCategoria && params.categoria_nome && categorias.length > 0) {
-      const match = categorias.find(c => c.nome === params.categoria_nome);
-      if (match) setIdCategoria(match.id_categoria);
-    }
-  }, [categorias, idCategoria, params.categoria_nome]);
-
-  function validate(): boolean {
-    const errs: Record<string, string> = {};
-    if (!titulo.trim()) errs.titulo = "Título é obrigatório";
-    const num = parseMoneyInput(valor);
-    if (num <= 0) errs.valor = "Insira um valor válido";
-    if (!idCategoria) errs.categoria = "Selecione uma categoria";
-    const dataISO = parseDataToISO(data);
-    if (!dataISO) errs.data = "Data inválida";
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  }
-
-  async function handleSalvar() {
-    if (!validate()) return;
-    if (!user) return;
-
-    setSaving(true);
-    try {
-      const dataISO = parseDataToISO(data)!;
-      const valorNum = Math.abs(parseMoneyInput(valor));
-      const idCarteira = isConjunta ? user?.id_carteira_conjunta : user?.id_carteira_pessoal;
-
-      const payload = {
-        id_carteira: idCarteira,
-        id_usuario: user.id_usuario,
-        id_categoria: idCategoria,
-        titulo: titulo.trim(),
-        tipo,
-        valor: valorNum,
-        data_transacao: dataISO,
-        status: "PAGO",
-      };
-
-      if (isEditing) {
-        await apiRequest(`/transacoes/${params.id_transacao}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
-        showAlert("Sucesso", "Transação atualizada!");
-      } else {
-        await apiRequest("/transacoes", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        showAlert("Sucesso", "Transação cadastrada!");
-      }
-      dismiss();
-    } catch (err) {
-      showAlert("Erro", err instanceof Error ? err.message : "Não foi possível salvar.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const selectedCategory = categorias.find((c) => c.id_categoria === idCategoria);
   const categoryIcon = selectedCategory?.icone || "tag";
 
   return (
@@ -262,83 +109,7 @@ export default function TransactionFormScreen() {
         />
         {errors.valor && <Text style={styles.errorText}>{errors.valor}</Text>}
 
-        {/* Context Selector: Pessoal vs Conjunto */}
-        {!!user?.id_carteira_conjunta && (
-          <View style={styles.inputGroup}>
-          <Text style={styles.label}>TIPO DE LANÇAMENTO</Text>
-          <View style={{ gap: 10, marginBottom: 12 }}>
-            {/* Option 1: Pessoal */}
-            <Pressable
-              style={[
-                styles.contextCard,
-                !isConjunta && styles.contextCardActivePersonal,
-              ]}
-              onPress={() => setIsConjunta(false)}
-            >
-              <View style={[
-                styles.contextIconContainer,
-                { backgroundColor: !isConjunta ? Colors.primaryLight : "#F1F5F9" }
-              ]}>
-                <Feather 
-                  name="user" 
-                  size={20} 
-                  color={!isConjunta ? Colors.primary : Colors.textGray} 
-                />
-              </View>
-              <View style={styles.contextTextContainer}>
-                <Text style={[
-                  styles.contextTitle,
-                  !isConjunta && { color: Colors.primary, fontWeight: FontWeight.bold }
-                ]}>
-                  Lançamento Pessoal
-                </Text>
-                <Text style={styles.contextSubtitle}>Somente minha carteira</Text>
-              </View>
-              <View style={[
-                styles.contextRadio,
-                !isConjunta && { borderColor: Colors.primary, backgroundColor: Colors.primary }
-              ]}>
-                {!isConjunta && <View style={styles.contextRadioInner} />}
-              </View>
-            </Pressable>
-
-            {/* Option 2: Conjunto */}
-            <Pressable
-              style={[
-                styles.contextCard,
-                isConjunta && styles.contextCardActiveJoint,
-              ]}
-              onPress={() => setIsConjunta(true)}
-            >
-              <View style={[
-                styles.contextIconContainer,
-                { backgroundColor: isConjunta ? Colors.jointLight : "#F1F5F9" }
-              ]}>
-                <Feather 
-                  name="users" 
-                  size={20} 
-                  color={isConjunta ? Colors.jointPrimary : Colors.textGray} 
-                />
-              </View>
-              <View style={styles.contextTextContainer}>
-                <Text style={[
-                  styles.contextTitle,
-                  isConjunta && { color: Colors.jointPrimary, fontWeight: FontWeight.bold }
-                ]}>
-                  Lançamento Conjunto
-                </Text>
-                <Text style={styles.contextSubtitle}>Compartilhado com Família</Text>
-              </View>
-              <View style={[
-                styles.contextRadio,
-                isConjunta && { borderColor: Colors.jointPrimary, backgroundColor: Colors.jointPrimary }
-              ]}>
-                {isConjunta && <View style={styles.contextRadioInner} />}
-              </View>
-            </Pressable>
-          </View>
-        </View>
-        )}
+        {/* Context Selector Removido */}
 
         {/* Título */}
         <View style={styles.inputGroup}>
@@ -391,7 +162,7 @@ export default function TransactionFormScreen() {
                         borderColor: cat.cor_hex,
                       },
                     ]}
-                    onPress={() => setIdCategoria(cat.id_categoria)}
+                    onPress={() => handleSelectCategoria(cat)}
                   >
                     <View style={[
                       styles.categoriaIcon,

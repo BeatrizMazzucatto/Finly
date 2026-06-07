@@ -2,8 +2,6 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
-
-import { PhoneShell } from "@/components/PhoneShell";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { Colors } from "@/constants/theme";
@@ -44,24 +42,22 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <PhoneShell>
-        <ThemeProvider value={colorScheme === "dark" ? FinlyDarkTheme : FinlyLightTheme}>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="transaction-form"
-              options={{
-                presentation: "modal",
-                headerShown: false,
-              }}
-            />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </PhoneShell>
+      <ThemeProvider value={colorScheme === "dark" ? FinlyDarkTheme : FinlyLightTheme}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="transaction-form"
+            options={{
+              presentation: "modal",
+              headerShown: false,
+            }}
+          />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
     </AuthProvider>
   );
 }

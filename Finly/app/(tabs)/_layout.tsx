@@ -32,42 +32,7 @@ export default function TabsLayout() {
         }}
       />
 
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: "",
-          tabBarIcon: () => (
-            <View style={styles.addButton}>
-              <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.addGradient}>
-                <Feather name="plus" size={24} color={Colors.textInverse} />
-              </LinearGradient>
-            </View>
-          ),
-          tabBarButton: (props: any) => (
-            <Pressable
-              {...props}
-              onPress={() => {
-                const { router } = require("expo-router");
-                router.push("/transaction-form");
-              }}
-              style={styles.addButtonContainer}
-            >
-              <View style={styles.addButton}>
-                <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.addGradient}>
-                  <Feather name="plus" size={24} color={Colors.textInverse} />
-                </LinearGradient>
-              </View>
-            </Pressable>
-          ),
-        }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            const { router } = require("expo-router");
-            router.push("/transaction-form");
-          },
-        }}
-      />
+      <Tabs.Screen name="add" options={{ href: null }} />
 
       <Tabs.Screen
         name="groups"
