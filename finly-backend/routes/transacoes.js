@@ -107,6 +107,7 @@ router.get("/:id_usuario", (req, res) => {
       t.titulo,
       t.tipo,
       t.valor,
+      t.id_categoria,
       TO_CHAR(t.data_transacao, 'YYYY-MM-DD') AS data_transacao,
       c.nome AS categoria
     FROM transacoes t

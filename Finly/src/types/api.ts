@@ -16,4 +16,5 @@ export interface Transaction {
   valor: number;
   data_transacao: string;
   categoria: string | null;
+  id_categoria?: number;
 }

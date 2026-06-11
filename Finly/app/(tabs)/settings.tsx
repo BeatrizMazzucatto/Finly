@@ -170,6 +170,7 @@ export default function SettingsScreen() {
               <TextInput
                 style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]}
                 placeholder="Nome da categoria..."
+                placeholderTextColor={Colors.textMuted}
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
               />
@@ -209,9 +210,9 @@ export default function SettingsScreen() {
         {showSecurity && (
           <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginHorizontal: 20, marginBottom: 10 }}>
             <Text style={{ fontWeight: 'bold', marginBottom: 12, color: Colors.textPrimary }}>Alterar Senha</Text>
-            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Senha atual" secureTextEntry value={currentPassword} onChangeText={setCurrentPassword} />
-            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Nova senha" secureTextEntry value={newPassword} onChangeText={setNewPassword} />
-            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 16 }]} placeholder="Confirmar nova senha" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Senha atual" placeholderTextColor={Colors.textMuted} secureTextEntry value={currentPassword} onChangeText={setCurrentPassword} />
+            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Nova senha" placeholderTextColor={Colors.textMuted} secureTextEntry value={newPassword} onChangeText={setNewPassword} />
+            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 16 }]} placeholder="Confirmar nova senha" placeholderTextColor={Colors.textMuted} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
             <Pressable style={[styles.saveBtn, { height: 46 }]} onPress={handleUpdatePassword}>
               <Text style={{ color: '#fff', fontWeight: 'bold' }}>Atualizar Senha</Text>
             </Pressable>

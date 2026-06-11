@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  StyleSheet, Text, View, StatusBar, Modal, TextInput, Pressable, ActivityIndicator, ScrollView
+  StyleSheet, Text, View, StatusBar, Modal, TextInput, Pressable, ActivityIndicator, ScrollView, Dimensions
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Colors, Spacing, FontSize, FontWeight } from "@/constants/theme";
@@ -11,8 +11,9 @@ import { CategoryCard } from "@/components/CategoryCard";
 import { Chip, Card } from "@/components/ui";
 import { formatCurrency, formatDateMD } from "@/utils/formatters";
 import { getCategoryColor } from "@/constants/categories";
-import { useDashboardViewModel } from "@/src/viewmodels/useDashboardViewModel";
 import { router } from "expo-router";
+
+const SCREEN_W = Dimensions.get("window").width;
 
 export default function GroupsScreen() {
   const {
@@ -42,6 +43,7 @@ export default function GroupsScreen() {
     handleCreateWallet,
     handleJoinWallet,
     handleEditWallet,
+    handleRemoveMember,
     openEditModal,
     openDeleteFromSettings,
     openLeaveFromSettings,
@@ -57,10 +59,8 @@ export default function GroupsScreen() {
 
   const [viewMode, setViewMode] = React.useState<'INICIO' | 'HISTORICO' | 'LIMITE'>('INICIO');
   const [chartType, setChartType] = React.useState<'DESPESA' | 'RECEITA'>('DESPESA');
+  const [focusedCat, setFocusedCat] = React.useState<{ name: string, value: number } | null>(null);
   const activeCats = chartType === "DESPESA" ? expensesByCategory : incomesByCategory;
-
-  const { createTransaction } = useDashboardViewModel();
-  const [txModalVisible, setTxModalVisible] = React.useState(false);
 
   return (
     <View style={styles.container}>
@@ -113,10 +113,10 @@ export default function GroupsScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-                  <Pressable onPress={() => setChartType("DESPESA")} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "DESPESA" ? { backgroundColor: '#FEE2E2' } : { backgroundColor: 'transparent' }]}>
+                  <Pressable onPress={() => { setChartType("DESPESA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "DESPESA" ? { backgroundColor: '#FEE2E2' } : { backgroundColor: 'transparent' }]}>
                     <Text style={{ color: chartType === "DESPESA" ? '#EF4444' : '#64748B', fontWeight: 'bold' }}>Despesas</Text>
                   </Pressable>
-                  <Pressable onPress={() => setChartType("RECEITA")} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "RECEITA" ? { backgroundColor: '#D1FAE5' } : { backgroundColor: 'transparent' }]}>
+                  <Pressable onPress={() => { setChartType("RECEITA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "RECEITA" ? { backgroundColor: '#D1FAE5' } : { backgroundColor: 'transparent' }]}>
                     <Text style={{ color: chartType === "RECEITA" ? '#10B981' : '#64748B', fontWeight: 'bold' }}>Receitas</Text>
                   </Pressable>
                 </View>
@@ -127,19 +127,36 @@ export default function GroupsScreen() {
                       data={Object.entries(activeCats).map(([cat, val]) => ({
                         value: val,
                         color: getCategoryColor(cat),
+                        focused: focusedCat?.name === cat,
+                        onPress: () => {
+                          if (focusedCat?.name === cat) setFocusedCat(null);
+                          else setFocusedCat({ name: cat, value: val });
+                        },
                       }))}
                       donut
+                      focusOnPress
+                      toggleFocusOnPress
                       radius={100}
                       innerRadius={70}
                       innerCircleColor={'#F8FAFC'}
-                      centerLabelComponent={() => (
-                        <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 12, color: '#64748B', fontWeight: 'bold' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
-                          <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#EF4444' : '#10B981', fontWeight: 'bold' }}>
-                            {formatCurrency(chartType === "DESPESA" ? totalDespesasConjuntas : totalReceitas)}
-                          </Text>
-                        </View>
-                      )}
+                      centerLabelComponent={() => {
+                        if (focusedCat) {
+                          return (
+                            <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+                              <Text style={{ fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold' }}>{focusedCat.name}</Text>
+                              <Text style={{ fontSize: 20, color: '#0F172A', fontWeight: 'bold' }}>{formatCurrency(focusedCat.value)}</Text>
+                            </View>
+                          );
+                        }
+                        return (
+                          <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: 'bold' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
+                            <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#EF4444' : '#10B981', fontWeight: 'bold' }}>
+                              {formatCurrency(chartType === "DESPESA" ? totalDespesasConjuntas : totalReceitas)}
+                            </Text>
+                          </View>
+                        );
+                      }}
                     />
                   ) : (
                     <View style={styles.ringContainer}>
@@ -175,7 +192,7 @@ export default function GroupsScreen() {
                 <View style={{ marginBottom: 16 }}>
                   <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>Transações Recentes</Text>
                 </View>
-                
+
                 {recentTransactions.length === 0 ? (
                   <View style={{ alignItems: 'center', padding: 20, backgroundColor: 'white', borderRadius: 20, elevation: 2 }}>
                     <Feather name="inbox" size={40} color={Colors.textMuted} style={{ marginBottom: 10 }} />
@@ -241,18 +258,28 @@ export default function GroupsScreen() {
                 </Card>
 
                 {historyFilter === 'Todos' && lineDataBalance.length > 0 && (
-                  <Card style={{ marginBottom: Spacing.lg }}>
+                  <Card style={styles.summaryCard}>
                     <Text style={{ fontSize: 14, fontWeight: "bold", color: Colors.textPrimary, marginBottom: 12 }}>Saldo</Text>
-                    <View style={{ alignItems: "center" }}>
+                    <View style={{ alignItems: "center", width: "100%" }}>
+                      <Text style={{ fontSize: 10, color: Colors.textMuted, marginBottom: 4, alignSelf: 'flex-start' }}>Valor (R$)</Text>
                       <LineChart
                         data={lineDataBalance}
-                        areaChart hideDataPoints
+                        areaChart
                         startFillColor={Colors.jointPrimary} startOpacity={0.3}
-                        endFillColor={Colors.jointPrimary}   endOpacity={0.02}
-                        color={Colors.jointPrimary} thickness={2}
-                        xAxisThickness={0} yAxisThickness={0}
-                        hideYAxisText hideRules curved height={100} width={250}
+                        endFillColor={Colors.jointPrimary} endOpacity={0.02}
+                        color={Colors.jointPrimary} thickness={3}
+                        xAxisColor={Colors.border} yAxisColor={Colors.border}
+                        yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
+                        xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
+                        rulesColor={Colors.borderLight}
+                        curved
+                        height={120}
+                        width={SCREEN_W - 90}
+                        initialSpacing={20}
+                        noOfSections={4}
+                        isAnimated
                       />
+                      <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 4, textAlign: 'center' }}>Dias do mês</Text>
                     </View>
                   </Card>
                 )}
@@ -312,7 +339,7 @@ export default function GroupsScreen() {
                       </View>
                     )}
                   />
-                  <Text style={styles.limitText}>Gasto: R$ {totalDespesasConjuntas.toFixed(2)} / R$ {tetoLimit.toFixed(2)}</Text>
+                  <Text style={styles.limitText}>Gasto: {formatCurrency(totalDespesasConjuntas)} / {formatCurrency(tetoLimit)}</Text>
 
                   {progressPercentage >= 80 && (
                     <View style={styles.alertBox}>
@@ -323,8 +350,8 @@ export default function GroupsScreen() {
                 </View>
 
                 <View style={styles.card}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                    <Text style={styles.cardTitle}>Membros do Grupo</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%' }}>
+                    <Text style={[styles.cardTitle, { marginBottom: 0, width: 'auto' }]}>Membros do Grupo</Text>
                     <Feather name="users" size={24} color={Colors.jointPrimary} />
                   </View>
 
@@ -338,6 +365,11 @@ export default function GroupsScreen() {
                           <Text style={styles.memberName}>{member.nome} {member.id_usuario === user?.id_usuario && "(Você)"}</Text>
                           <Text style={styles.memberRole}>{member.papel === 'PROPRIETARIO' ? 'Administrador' : 'Membro'}</Text>
                         </View>
+                        {currentUserRole === 'PROPRIETARIO' && member.id_usuario !== user?.id_usuario && (
+                          <Pressable onPress={() => handleRemoveMember(member.id_usuario, member.nome)} style={{ padding: 6 }}>
+                            <Feather name="user-x" size={20} color={Colors.error} />
+                          </Pressable>
+                        )}
                       </View>
                     ))
                   ) : (
@@ -383,7 +415,12 @@ export default function GroupsScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Editar Carteira</Text>
             <Text style={styles.modalLabel}>Novo Nome</Text>
-            <TextInput style={styles.modalInput} placeholder="Ex: Despesas de Casa" value={newWalletName} onChangeText={setNewWalletName} />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ex: Despesas de Casa"
+              value={newWalletName}
+              onChangeText={setNewWalletName}
+            />
             <Text style={styles.modalLabel}>Novo Limite Mensal (R$)</Text>
             <TextInput style={styles.modalInput} placeholder="Ex: 8000" value={newWalletLimit} onChangeText={setNewWalletLimit} keyboardType="numeric" />
             <View style={styles.modalActions}>

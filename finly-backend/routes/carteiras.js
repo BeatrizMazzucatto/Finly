@@ -7,11 +7,11 @@ router.get("/:id/limite", async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query(
-      "SELECT limite_gastos_mensal FROM carteiras WHERE id_carteira = $1",
+      "SELECT nome, limite_gastos_mensal FROM carteiras WHERE id_carteira = $1",
       [id]
     );
     if (result.rowCount === 0) return res.status(404).json({ erro: "Carteira não encontrada" });
-    res.json({ limite: result.rows[0].limite_gastos_mensal });
+    res.json({ nome: result.rows[0].nome, limite: result.rows[0].limite_gastos_mensal });
   } catch (err) {
     console.error("Erro ao buscar limite da carteira:", err);
     res.status(500).json({ erro: "Erro interno do servidor" });

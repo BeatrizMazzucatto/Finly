@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
   Alert,
+  Image,
 } from "react-native";
 import { useAuth } from "@/src/context/AuthContext";
 import { apiRequest } from "@/src/services/api";
@@ -60,12 +61,18 @@ export default function RegisterScreen() {
       style={styles.container}
     >
       <View style={styles.card}>
+        <Image
+          source={require("../assets/images/logoFinly.jpeg")}
+          style={{ width: 120, height: 120, alignSelf: 'center', marginBottom: 16, borderRadius: 20 }}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>Criar Conta</Text>
         <Text style={styles.subtitle}>Abra seu acesso e comece a organizar suas finanças.</Text>
 
         <TextInput
           autoCapitalize="words"
           placeholder="Nome"
+          placeholderTextColor="#64748B"
           style={styles.input}
           value={nome}
           onChangeText={setNome}
@@ -74,12 +81,14 @@ export default function RegisterScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           placeholder="Email"
+          placeholderTextColor="#64748B"
           style={styles.input}
           value={email}
           onChangeText={setEmail}
         />
         <TextInput
           placeholder="Senha"
+          placeholderTextColor="#64748B"
           secureTextEntry
           style={styles.input}
           value={senha}
@@ -87,6 +96,7 @@ export default function RegisterScreen() {
         />
         <TextInput
           placeholder="Confirme a senha"
+          placeholderTextColor="#64748B"
           secureTextEntry
           style={styles.input}
           value={confirmSenha}
@@ -104,7 +114,7 @@ export default function RegisterScreen() {
         </Pressable>
 
         <View style={styles.linkRow}>
-          <Pressable onPress={() => router.replace("/login")}> 
+          <Pressable onPress={() => router.replace("/login")}>
             <Text style={styles.linkText}>Voltar ao login</Text>
           </Pressable>
         </View>
@@ -116,7 +126,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F6FF",
+    backgroundColor: "#6c8452",
     alignItems: "center",
     justifyContent: "center",
     padding: 16,
@@ -126,7 +136,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     borderRadius: 16,
     padding: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#86a46e",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
@@ -136,12 +146,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: "#072d19",
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    color: "#475569",
+    color: "#072d19",
     marginBottom: 18,
   },
   input: {
@@ -153,6 +163,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 15,
     backgroundColor: "#FFFFFF",
+    color: "#475569",
   },
   error: {
     color: "#B91C1C",
@@ -162,7 +173,7 @@ const styles = StyleSheet.create({
   button: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#072d19",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -179,7 +190,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   linkText: {
-    color: "#2563EB",
+    color: "#072d19",
     fontWeight: "600",
     fontSize: 14,
   },

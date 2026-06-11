@@ -30,17 +30,39 @@ export function useGroupsViewModel() {
 
   const { transactions, refresh } = useTransactionSync(user?.id_usuario);
 
-  async function loadWalletData() {
-    if (!user?.id_carteira_conjunta) return;
+  const loadWalletData = useCallback(async () => {
+    if (!user?.id_carteira_conjunta || !user?.id_usuario) return;
     try {
       const resLimite = await fetch(`${API_BASE_URL}/carteiras/${user.id_carteira_conjunta}/limite`);
-      if (resLimite.ok) { const data = await resLimite.json(); setTetoLimit(Number(data.limite) || 2000); if (data.nome) setCurrentWalletName(data.nome); }
+      if (resLimite.ok) { 
+        const data = await resLimite.json(); 
+        setTetoLimit(Number(data.limite) || 2000); 
+        if (data.nome) setCurrentWalletName(data.nome); 
+      }
+      
       const resMembros = await fetch(`${API_BASE_URL}/carteiras/${user.id_carteira_conjunta}/membros`);
-      if (resMembros.ok) { const data = await resMembros.json(); setActiveMembers(data); }
-    } catch (err) { console.error("Erro ao carregar dados da carteira:", err); }
-  }
+      if (resMembros.ok) { 
+        const data = await resMembros.json(); 
+        
+        // Verifica se o usuário atual ainda está na lista de membros
+        const stillMember = data.find((m: any) => m.id_usuario === user.id_usuario);
+        if (!stillMember) {
+          await updateUser({ ...user, id_carteira_conjunta: null });
+          return;
+        }
+        
+        setActiveMembers(data); 
+      }
+    } catch (err) { 
+      console.error("Erro ao carregar dados da carteira:", err); 
+    }
+  }, [user]);
 
-  useEffect(() => { loadWalletData(); }, [user?.id_usuario, user?.id_carteira_conjunta]);
+  useEffect(() => { 
+    loadWalletData(); 
+    const interval = setInterval(loadWalletData, 5000);
+    return () => clearInterval(interval);
+  }, [loadWalletData]);
 
   const currentUserRole = useMemo(() => {
     const m = activeMembers.find(m => m.id_usuario === user?.id_usuario);
@@ -53,7 +75,7 @@ export function useGroupsViewModel() {
       const res = await fetch(`${API_BASE_URL}/carteiras/${user.id_carteira_conjunta}/codigo`);
       if (res.ok) {
         const data = await res.json();
-        showAlert("Código de Convite", `Compartilhe este código: ${data.codigo_convite}`);
+        showAlert("Código de Convite", `Compartilhe este código: ${data.codigo}`);
       }
     } catch (err) {
       showAlert("Erro", "Não foi possível recuperar o código de convite.");
@@ -67,7 +89,7 @@ export function useGroupsViewModel() {
       const res = await fetch(`${API_BASE_URL}/carteiras`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: newWalletName, limite_gastos: Number(newWalletLimit), id_usuario_criador: user?.id_usuario }),
+        body: JSON.stringify({ nome: newWalletName, limite_gastos_mensal: Number(newWalletLimit), id_usuario: user?.id_usuario }),
       });
       if (!res.ok) throw new Error("Erro ao criar carteira");
       
@@ -115,7 +137,7 @@ export function useGroupsViewModel() {
       const res = await fetch(`${API_BASE_URL}/carteiras/${user?.id_carteira_conjunta}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: newWalletName, limite_gastos: Number(newWalletLimit) || 0 }),
+        body: JSON.stringify({ nome: newWalletName, limite_gastos_mensal: Number(newWalletLimit) || 0 }),
       });
       if (!res.ok) throw new Error("Erro ao salvar alterações");
       
@@ -139,6 +161,19 @@ export function useGroupsViewModel() {
     };
     if (Platform.OS === 'web') { if (window.confirm("Tem certeza que deseja sair desta carteira conjunta?")) executeLeave(); }
     else { Alert.alert("Sair", "Deseja mesmo sair?", [{ text: "Cancelar", style: "cancel" }, { text: "Sair", style: "destructive", onPress: executeLeave }]); }
+  };
+
+  const handleRemoveMember = async (memberId: number, memberName: string) => {
+    const executeRemove = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/carteiras/${user?.id_carteira_conjunta}/membros/${memberId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error();
+        showAlert("Sucesso", `${memberName} foi removido da carteira.`);
+        loadWalletData();
+      } catch (err) { showAlert("Erro", "Falha ao remover membro."); }
+    };
+    if (Platform.OS === 'web') { if (window.confirm(`Tem certeza que deseja remover ${memberName}?`)) executeRemove(); }
+    else { Alert.alert("Remover Membro", `Deseja mesmo remover ${memberName}?`, [{ text: "Cancelar", style: "cancel" }, { text: "Remover", style: "destructive", onPress: executeRemove }]); }
   };
 
   const handleDeleteWallet = async () => {
@@ -281,7 +316,12 @@ export function useGroupsViewModel() {
       return { value: currentBalance, label: date.split("-")[2] };
     });
     
-    return [{ value: 0, label: "" }, ...data];
+    const finalData = [{ value: 0, label: "" }, ...data];
+    const minVal = Math.min(...finalData.map(d => d.value));
+    if (minVal < 0) {
+      return finalData.map(d => ({ ...d, value: d.value - minVal }));
+    }
+    return finalData;
   }, [historyTransactions, historyFilter]);
 
   const navigateMonth = useCallback((direction: 'prev'|'next') => {
@@ -331,6 +371,7 @@ export function useGroupsViewModel() {
           valor: String(item.valor),
           tipo: item.tipo,
           categoria_nome: item.categoria ?? "",
+          id_categoria: item.id_categoria ? String(item.id_categoria) : undefined,
           data_transacao: item.data_transacao,
           id_carteira: String(item.id_carteira ?? 3),
         },
@@ -370,6 +411,7 @@ export function useGroupsViewModel() {
     setModalCreateVisible, setModalJoinVisible, setModalEditVisible, setModalSettingsVisible,
     setNewWalletName, setNewWalletLimit, setJoinCode,
     handleShowInviteCode, handleCreateWallet, handleJoinWallet, handleEditWallet,
+    handleRemoveMember,
     openEditModal, openDeleteFromSettings, openLeaveFromSettings,
     historyFilter, setHistoryFilter, activeMonthFilter, historyTransactions,
     histReceitas, histDespesas, histLucro, navigateMonth, canGoPrev, canGoNext,

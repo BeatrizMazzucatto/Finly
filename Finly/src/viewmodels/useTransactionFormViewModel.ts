@@ -42,7 +42,15 @@ export function useTransactionFormViewModel(params: TransactionFormParams) {
   const isEditing = !!params.id_transacao;
 
   const [titulo, setTitulo] = useState(params.titulo ?? "");
-  const [valor, setValor] = useState(params.valor ?? "");
+  const [valor, setValor] = useState(() => {
+    if (params.valor) {
+      const num = parseFloat(params.valor);
+      if (!isNaN(num)) {
+        return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+    }
+    return "";
+  });
   const [tipo, setTipo] = useState<"RECEITA" | "DESPESA">(
     (params.tipo as "RECEITA" | "DESPESA") ?? "DESPESA"
   );

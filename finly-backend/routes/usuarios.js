@@ -105,7 +105,7 @@ router.post("/:id/onboarding", async (req, res) => {
     // Criar carteira pessoal
     const carteiraRes = await db.query(
       "INSERT INTO carteiras (nome, tipo, limite_gastos_mensal) VALUES ($1, $2, $3) RETURNING id_carteira",
-      [`Pessoal - ${userName}`, "PESSOAL", 0]
+      [`Pessoal - ${userName}`, "PESSOAL", Number(renda_mensal)]
     );
     const id_carteira = carteiraRes.rows[0].id_carteira;
 
