@@ -6,7 +6,7 @@ import { CATEGORIAS } from "@/constants/categories";
 import { Colors } from "@/constants/theme";
 import { formatCurrency, formatCurrencyShort } from "@/utils/formatters";
 
-const CATEGORY_COLORS = ["#4F46E5","#10B981","#F59E0B","#EF4444","#8B5CF6","#EC4899","#14B8A6","#F97316","#6366F1","#84CC16"];
+const CATEGORY_COLORS = ["#4F46E5","#3A8F31","#F59E0B","#D6492B","#8B5CF6","#EC4899","#14B8A6","#F97316","#6366F1","#84CC16"];
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const MONTHS_FULL = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 

@@ -84,6 +84,8 @@ export default function HistoryScreen() {
         valor={Number(t.valor)}
         tipo={t.tipo}
         categoria={t.categoria ?? "Outros"}
+        icone={t.icone}
+        cor_hex={t.cor_hex}
         data={t.data_transacao}
         showActions
         onEdit={() => handleEdit(t)}
@@ -106,10 +108,10 @@ export default function HistoryScreen() {
         <Text style={styles.title}>Histórico</Text>
         <View style={{ flexDirection: "row", gap: 12 }}>
           <Pressable onPress={toggleSort} style={styles.iconBtn}>
-            <Feather name="sliders" size={22} color={Colors.textPrimary} />
+            <Feather name="sliders" size={22} color={"#14391f"} />
           </Pressable>
           <Pressable onPress={toggleSearch} style={styles.iconBtn}>
-            <Feather name="search" size={22} color={Colors.textPrimary} />
+            <Feather name="search" size={22} color={"#14391f"} />
           </Pressable>
         </View>
       </View>
@@ -136,18 +138,18 @@ export default function HistoryScreen() {
       {/* Search */}
       {showSearch && (
         <View style={styles.searchContainer}>
-          <Feather name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
+          <Feather name="search" size={20} color={"#14391f"} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar transações..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={"#14391f"}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
           />
           {searchQuery.length > 0 && (
             <Pressable onPress={() => setSearchQuery("")}>
-              <Feather name="x" size={20} color={Colors.textMuted} />
+              <Feather name="x" size={20} color={"#14391f"} />
             </Pressable>
           )}
         </View>
@@ -164,11 +166,11 @@ export default function HistoryScreen() {
       {monthFilters.length > 0 && activeMonthFilter && (
         <View style={styles.monthSelector}>
           <Pressable style={styles.monthArrow} onPress={navigateToPrevMonth}>
-            <Feather name="chevron-left" size={24} color={canGoPrevMonth() ? Colors.textPrimary : Colors.textMuted} />
+            <Feather name="chevron-left" size={24} color={canGoPrevMonth() ? "#14391f" : "#14391f"} />
           </Pressable>
           <Text style={styles.monthLabel}>{activeMonthFilter.label}</Text>
           <Pressable style={styles.monthArrow} onPress={navigateToNextMonth}>
-            <Feather name="chevron-right" size={24} color={canGoNextMonth() ? Colors.textPrimary : Colors.textMuted} />
+            <Feather name="chevron-right" size={24} color={canGoNextMonth() ? "#14391f" : "#14391f"} />
           </Pressable>
         </View>
       )}
@@ -197,9 +199,9 @@ export default function HistoryScreen() {
       {/* Gráfico saldo */}
       {activeFilter === "Todos" && lineDataBalance.length > 0 && (
         <Card style={styles.summaryCard}>
-          <Text style={{ fontSize: 14, fontWeight: "bold", color: Colors.textPrimary, marginBottom: 12 }}>Saldo</Text>
+          <Text style={{ fontSize: 14, fontWeight: "bold", color: "#14391f", marginBottom: 12 }}>Saldo</Text>
           <View style={{ alignItems: "center", width: "100%" }}>
-            <Text style={{ fontSize: 10, color: Colors.textMuted, marginBottom: 4, alignSelf: 'flex-start' }}>Valor (R$)</Text>
+            <Text style={{ fontSize: 10, color: "#14391f", marginBottom: 4, alignSelf: 'flex-start' }}>Valor (R$)</Text>
             <LineChart
               data={lineDataBalance}
               areaChart 
@@ -207,8 +209,8 @@ export default function HistoryScreen() {
               endFillColor={Colors.primary} endOpacity={0.02}
               color={Colors.primary} thickness={3}
               xAxisColor={Colors.border} yAxisColor={Colors.border}
-              yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
-              xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
+              yAxisTextStyle={{ color: "#14391f", fontSize: 10 }}
+              xAxisLabelTextStyle={{ color: "#14391f", fontSize: 10 }}
               rulesColor={Colors.borderLight}
               curved 
               height={120} 
@@ -217,7 +219,7 @@ export default function HistoryScreen() {
               noOfSections={4}
               isAnimated
             />
-            <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 4, textAlign: 'center' }}>Dias do mês</Text>
+            <Text style={{ fontSize: 10, color: "#14391f", marginTop: 4, textAlign: 'center' }}>Dias do mês</Text>
           </View>
         </Card>
       )}
@@ -229,7 +231,7 @@ export default function HistoryScreen() {
 
   const ListEmpty = useMemo(() => (
     <Card style={styles.emptyCard}>
-      <Feather name="inbox" size={48} color={Colors.textMuted} />
+      <Feather name="inbox" size={48} color={"#14391f"} />
       <Text style={styles.emptyTitle}>Nenhuma transação encontrada</Text>
       <Text style={styles.emptySubtitle}>
         {searchQuery || activeFilter !== "Todos" ? "Tente ajustar seus filtros" : "Comece adicionando sua primeira transação"}
@@ -263,36 +265,36 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: '#d3f394' },
   content: { padding: Spacing.xl, paddingTop: 50, paddingBottom: 100 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.lg },
   iconBtn: { padding: Spacing.xs, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: "#14391f" },
   searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 16, paddingHorizontal: 16, marginBottom: Spacing.md },
   searchIcon: { marginRight: Spacing.sm },
-  searchInput: { flex: 1, paddingVertical: 14, fontSize: FontSize.md, color: Colors.textPrimary },
+  searchInput: { flex: 1, paddingVertical: 14, fontSize: FontSize.md, color: "#14391f" },
   filtersRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg, flexWrap: "wrap" },
   summaryCard: { marginBottom: Spacing.lg },
   summaryRow: { flexDirection: "row", marginBottom: Spacing.md },
   summaryItem: { flex: 1, alignItems: "center" },
   summaryDivider: { width: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.lg },
-  summaryLabel: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
+  summaryLabel: { fontSize: FontSize.xs, color: "#14391f", marginBottom: Spacing.xs },
   summaryValue: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
   summaryTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
-  summaryTotalLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  summaryTotalLabel: { fontSize: FontSize.sm, color: "#14391f" },
   summaryTotalValue: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
   monthSelector: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surface, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.full, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
   monthArrow: { padding: Spacing.xs },
-  monthLabel: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, textTransform: "capitalize" },
+  monthLabel: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: "#14391f", textTransform: "capitalize" },
   sortDropdown: { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  sortDropdownTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textSecondary, marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
+  sortDropdownTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: "#14391f", marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 },
   sortDropdownItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  sortDropdownText: { fontSize: FontSize.md, color: Colors.textPrimary },
-  dateHeader: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textSecondary, marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5, marginTop: Spacing.md },
+  sortDropdownText: { fontSize: FontSize.md, color: "#14391f" },
+  dateHeader: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: "#14391f", marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5, marginTop: Spacing.md },
   transactionItem: { marginBottom: Spacing.sm },
   emptyCard: { alignItems: "center", paddingVertical: Spacing.xxl, gap: Spacing.sm },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
-  emptySubtitle: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: "center" },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: "#14391f" },
+  emptySubtitle: { fontSize: FontSize.sm, color: "#14391f", textAlign: "center" },
   emptyButton: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, backgroundColor: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderRadius: BorderRadius.md, marginTop: Spacing.md },
   emptyButtonText: { color: Colors.textInverse, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
 });

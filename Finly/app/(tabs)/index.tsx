@@ -57,8 +57,8 @@ export default function DashboardScreen() {
               </Text>
             </View>
             <View>
-              <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>Olá!</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>{user?.nome}</Text>
+              <Text style={{ color: '#14391f', fontSize: 12, fontWeight: '600' }}>Olá!</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#14391f' }}>{user?.nome}</Text>
             </View>
           </View>
         </View>
@@ -66,17 +66,17 @@ export default function DashboardScreen() {
         {/* Wallet Filter Toggle Removido (Apenas Pessoal) */}
 
         <View style={styles.balanceContainer}>
-          <Text style={{ color: '#64748B', fontSize: 14, fontWeight: '600', textTransform: 'uppercase' }}>Balanço do Período</Text>
-          <Text style={{ fontSize: 38, fontWeight: 'bold', color: '#0F172A' }}>{formatCurrency(saldo)}</Text>
+          <Text style={{ color: '#14391f', fontSize: 14, fontWeight: '600', textTransform: 'uppercase' }}>Balanço do Período</Text>
+          <Text style={{ fontSize: 38, fontWeight: 'bold', color: '#14391f' }}>{formatCurrency(saldo)}</Text>
         </View>
 
         {/* Chart Type Toggle */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-          <Pressable onPress={() => { setChartType("DESPESA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "DESPESA" ? { backgroundColor: '#FEE2E2' } : { backgroundColor: 'transparent' }]}>
-            <Text style={{ color: chartType === "DESPESA" ? '#EF4444' : '#64748B', fontWeight: 'bold' }}>Despesas</Text>
+          <Pressable onPress={() => { setChartType("DESPESA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "DESPESA" ? { backgroundColor: '#D6492B' } : { backgroundColor: 'transparent' }]}>
+            <Text style={{ color: chartType === "DESPESA" ? 'white' : '#14391f', fontWeight: 'bold' }}>Despesas</Text>
           </Pressable>
-          <Pressable onPress={() => { setChartType("RECEITA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "RECEITA" ? { backgroundColor: '#D1FAE5' } : { backgroundColor: 'transparent' }]}>
-            <Text style={{ color: chartType === "RECEITA" ? '#10B981' : '#64748B', fontWeight: 'bold' }}>Receitas</Text>
+          <Pressable onPress={() => { setChartType("RECEITA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "RECEITA" ? { backgroundColor: '#3A8F31' } : { backgroundColor: 'transparent' }]}>
+            <Text style={{ color: chartType === "RECEITA" ? 'white' : '#14391f', fontWeight: 'bold' }}>Receitas</Text>
           </Pressable>
         </View>
 
@@ -84,13 +84,13 @@ export default function DashboardScreen() {
         <View style={{ alignItems: 'center', marginBottom: 40 }}>
           {Object.entries(activeCats).length > 0 ? (
             <PieChart
-              data={Object.entries(activeCats).map(([cat, val]) => ({
-                value: val,
-                color: getCategoryColor(cat),
+              data={Object.entries(activeCats).map(([cat, data]) => ({
+                value: data.value,
+                color: data.cor_hex || getCategoryColor(cat),
                 focused: focusedCat?.name === cat,
                 onPress: () => {
                   if (focusedCat?.name === cat) setFocusedCat(null);
-                  else setFocusedCat({ name: cat, value: val });
+                  else setFocusedCat({ name: cat, value: data.value });
                 },
               }))}
               donut
@@ -98,20 +98,20 @@ export default function DashboardScreen() {
               toggleFocusOnPress
               radius={100}
               innerRadius={70}
-              innerCircleColor={'#F8FAFC'}
+              innerCircleColor={'#d3f394'}
               centerLabelComponent={() => {
                 if (focusedCat) {
                   return (
                     <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold' }}>{focusedCat.name}</Text>
-                      <Text style={{ fontSize: 20, color: '#0F172A', fontWeight: 'bold' }}>{formatCurrency(focusedCat.value)}</Text>
+                      <Text style={{ fontSize: 12, color: '#14391f', fontWeight: 'bold' }}>{focusedCat.name}</Text>
+                      <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#D6492B' : '#3A8F31', fontWeight: 'bold' }}>{formatCurrency(focusedCat.value)}</Text>
                     </View>
                   );
                 }
                 return (
                   <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: 'bold' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
-                    <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#EF4444' : '#10B981', fontWeight: 'bold' }}>
+                    <Text style={{ fontSize: 12, color: '#14391f', fontWeight: 'bold' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
+                    <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#D6492B' : '#3A8F31', fontWeight: 'bold' }}>
                       {formatCurrency(chartType === "DESPESA" ? totalDespesas : totalReceitas)}
                     </Text>
                   </View>
@@ -121,8 +121,8 @@ export default function DashboardScreen() {
           ) : (
             <View style={styles.ringContainer}>
               <View style={styles.ringInner}>
-                <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0F172A' }}>
+                <Text style={{ color: '#14391f', fontSize: 12, fontWeight: '600' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: chartType === "DESPESA" ? '#D6492B' : '#3A8F31' }}>
                   {formatCurrency(chartType === "DESPESA" ? totalDespesas : totalReceitas)}
                 </Text>
               </View>
@@ -138,12 +138,12 @@ export default function DashboardScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 16 }}>
           {Object.entries(activeCats).length === 0 ? (
-            <Text style={{ color: '#64748B', paddingHorizontal: 16 }}>
+            <Text style={{ color: '#14391f', paddingHorizontal: 16 }}>
               {chartType === 'DESPESA' ? 'Nenhum gasto registrado.' : 'Nenhuma receita registrada.'}
             </Text>
           ) : (
-            Object.entries(activeCats).map(([cat, val]) => (
-              <CategoryCard key={cat} category={cat} value={val} />
+            Object.entries(activeCats).map(([cat, data]) => (
+              <CategoryCard key={cat} category={cat} value={data.value} icone={data.icone} cor_hex={data.cor_hex} />
             ))
           )}
         </ScrollView>
@@ -156,7 +156,7 @@ export default function DashboardScreen() {
         {loadingData ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: 20 }} />
         ) : recentTransactions.length === 0 ? (
-          <Text style={{ color: '#64748B', textAlign: 'center', marginTop: 20 }}>Nenhuma transação cadastrada.</Text>
+          <Text style={{ color: '#14391f', textAlign: 'center', marginTop: 20 }}>Nenhuma transação cadastrada.</Text>
         ) : (
           recentTransactions.map((t, idx) => (
             <TransactionItem
@@ -168,6 +168,8 @@ export default function DashboardScreen() {
               valor={Number(t.valor)}
               tipo={t.tipo}
               categoria={t.categoria || "Outros"}
+              icone={t.icone}
+              cor_hex={t.cor_hex}
               data={formatDate(t.data_transacao)}
               style={{ marginBottom: 12 }}
             />
@@ -183,7 +185,7 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#d3f394' },
   scrollContent: { padding: 20, paddingTop: 60, paddingBottom: 100 },
   dashHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   walletToggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8, shadowColor: 'black', shadowOffset: { width: 0, height: 2 }, shadowRadius: 4 },
@@ -191,6 +193,6 @@ const styles = StyleSheet.create({
   ringContainer: { alignSelf: 'center', width: 200, height: 200, borderRadius: 100, borderWidth: 15, borderColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
   ringInner: { alignItems: 'center' },
   sectionHeader: { marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#14391f' },
   fab: { position: 'absolute', bottom: 100, right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5, zIndex: 1000 },
 });

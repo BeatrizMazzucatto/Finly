@@ -7,11 +7,13 @@ import { formatCurrency } from '@/utils/formatters';
 type CategoryCardProps = {
   category: string;
   value: number;
+  icone?: string;
+  cor_hex?: string;
 };
 
-export const CategoryCard = memo(function CategoryCard({ category, value }: CategoryCardProps) {
-  const iconName = getCategoryIcon(category);
-  const color = getCategoryColor(category);
+export const CategoryCard = memo(function CategoryCard({ category, value, icone, cor_hex }: CategoryCardProps) {
+  const iconName = (icone as any) || getCategoryIcon(category);
+  const color = cor_hex || getCategoryColor(category);
 
   return (
     <View style={styles.catCard}>

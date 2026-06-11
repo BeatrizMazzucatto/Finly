@@ -22,6 +22,8 @@ interface TransactionItemProps {
   tipo: "RECEITA" | "DESPESA";
   categoria: string;
   data: string;
+  icone?: string;
+  cor_hex?: string;
   onPress?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -38,6 +40,8 @@ export const TransactionItem = memo(function TransactionItem({
   tipo,
   categoria,
   data,
+  icone,
+  cor_hex,
   onPress,
   onEdit,
   onDelete,
@@ -45,8 +49,8 @@ export const TransactionItem = memo(function TransactionItem({
   style,
 }: TransactionItemProps) {
   const isExpense = tipo === "DESPESA";
-  const iconName = getCategoryIcon(categoria);
-  const categoryColor = getCategoryColor(categoria);
+  const iconName = (icone as any) || getCategoryIcon(categoria);
+  const categoryColor = cor_hex || getCategoryColor(categoria);
 
   const { user } = useAuth();
   const isJoint = id_carteira !== undefined && id_carteira === user?.id_carteira_conjunta;

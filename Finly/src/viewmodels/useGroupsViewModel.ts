@@ -213,7 +213,8 @@ export function useGroupsViewModel() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    let s = 0; let d = 0; let r = 0; let expCats: Record<string, number> = {}; let incCats: Record<string, number> = {};
+    type CatData = { value: number; icone?: string; cor_hex?: string };
+    let s = 0; let d = 0; let r = 0; let expCats: Record<string, CatData> = {}; let incCats: Record<string, CatData> = {};
     jointTransactions.forEach(t => {
       const parts = t.data_transacao.split('-');
       if (parts.length >= 2) {
@@ -225,9 +226,13 @@ export function useGroupsViewModel() {
       const val = Number(t.valor);
       const c = t.categoria || "Outros";
       if (t.tipo === "RECEITA") {
-        s += val; r += val; incCats[c] = (incCats[c] || 0) + val;
+        s += val; r += val;
+        if (!incCats[c]) incCats[c] = { value: 0, icone: t.icone, cor_hex: t.cor_hex };
+        incCats[c].value += val;
       } else {
-        s -= val; d += val; expCats[c] = (expCats[c] || 0) + val;
+        s -= val; d += val;
+        if (!expCats[c]) expCats[c] = { value: 0, icone: t.icone, cor_hex: t.cor_hex };
+        expCats[c].value += val;
       }
     });
     return { saldo: s, totalDespesas: d, totalReceitas: r, expensesByCategory: expCats, incomesByCategory: incCats };

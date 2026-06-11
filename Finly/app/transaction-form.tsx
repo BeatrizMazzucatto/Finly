@@ -51,17 +51,19 @@ export default function TransactionFormScreen() {
       behavior={Platform.select({ ios: "padding", default: undefined })}
     >
       <StatusBar barStyle="dark-content" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.closeButton} />
         <Text style={styles.headerTitle}>
-          {isEditing ? "Editar Transação" : "Nova Transação"}
+          {isEditing 
+            ? (isConjunta ? "Editar Transação Conjunta" : "Editar Transação") 
+            : (isConjunta ? "Nova Transação Conjunta" : "Nova Transação")}
         </Text>
         <View style={styles.closeButton} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
@@ -102,7 +104,7 @@ export default function TransactionFormScreen() {
         <TextInput
           style={styles.valorInput}
           placeholder="R$ 0,00"
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor="#14391f"
           keyboardType="numeric"
           value={valor ? (valor.startsWith("R$") ? valor : `R$ ${valor}`) : ""}
           onChangeText={(text) => handleValorChange(text.replace(/^R\$\s?/, ""))}
@@ -157,7 +159,7 @@ export default function TransactionFormScreen() {
                     key={cat.id_categoria}
                     style={[
                       styles.categoriaItem,
-                      isSelected && { 
+                      isSelected && {
                         backgroundColor: cat.cor_hex + "20",
                         borderColor: cat.cor_hex,
                       },
@@ -168,10 +170,10 @@ export default function TransactionFormScreen() {
                       styles.categoriaIcon,
                       { backgroundColor: cat.cor_hex + "20" },
                     ]}>
-                      <Feather 
-                        name={cat.icone as any} 
-                        size={18} 
-                        color={cat.cor_hex} 
+                      <Feather
+                        name={cat.icone as any}
+                        size={18}
+                        color={cat.cor_hex}
                       />
                     </View>
                     <Text style={[
@@ -201,7 +203,7 @@ export default function TransactionFormScreen() {
           disabled={saving}
         >
           <LinearGradient
-            colors={isConjunta ? ["#9333EA", "#C084FC"] : ["#4F46E5", "#3B82F6"]}
+            colors={["#14391f", "#14391f"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.saveGradient}
@@ -223,7 +225,7 @@ export default function TransactionFormScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#d3f394',
   },
   header: {
     flexDirection: "row",
@@ -232,9 +234,9 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#d3f394',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#d3f394',
   },
   closeButton: {
     width: 40,
@@ -244,9 +246,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: FontSize.lg,
+    fontSize: 24,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: '#14391f',
   },
   content: {
     flex: 1,
@@ -271,23 +273,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tipoButtonActiveExpense: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#D6492B',
     ...Shadow.sm,
   },
   tipoButtonActiveIncome: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#3A8F31',
     ...Shadow.sm,
   },
   tipoText: {
     fontSize: 16,
     fontWeight: FontWeight.semibold,
-    color: Colors.textGray,
+    color: '#14391f',
   },
   tipoTextActiveExpense: {
-    color: Colors.error,
+    color: 'white',
   },
   tipoTextActiveIncome: {
-    color: Colors.success,
+    color: 'white',
   },
   valorInput: {
     fontSize: 40,
@@ -304,14 +306,14 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
+    color: '#14391f',
     letterSpacing: 0.5,
     marginBottom: Spacing.sm,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "white",
     borderRadius: 16,
     paddingHorizontal: 16,
     borderWidth: 2,
@@ -327,7 +329,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     fontSize: FontSize.md,
-    color: Colors.textPrimary,
+    color: '#14391f',
   },
   errorText: {
     color: Colors.error,
@@ -366,9 +368,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: Spacing.xl,
     paddingBottom: 35,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#d3f394',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: '#d3f394',
     gap: 12,
   },
   saveButton: {
@@ -457,6 +459,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: FontWeight.semibold,
-    color: Colors.textPrimary,
+    color: '#14391f',
   },
 });

@@ -5,6 +5,7 @@ export interface Category {
   nome: string;
   cor_hex: string;
   icone: string;
+  id_carteira?: number;
 }
 
 export async function getCategories(carteiras: (number | null)[] = []): Promise<Category[]> {

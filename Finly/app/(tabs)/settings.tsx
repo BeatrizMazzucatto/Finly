@@ -92,7 +92,7 @@ export default function SettingsScreen() {
                 <Feather name="check" size={16} color={Colors.textInverse} />
               </Pressable>
               <Pressable style={styles.editLimitCancelBtn} onPress={() => setEditingLimite(false)}>
-                <Feather name="x" size={16} color={Colors.textPrimary} />
+                <Feather name="x" size={16} color={"#14391f"} />
               </Pressable>
             </View>
           </View>
@@ -117,15 +117,15 @@ export default function SettingsScreen() {
               <Text style={styles.menuItemSubtitle}>{categories.length} categorias configuradas</Text>
             </View>
           </View>
-          <Feather name={showCategories ? "chevron-down" : "chevron-right"} size={20} color={Colors.textMuted} />
+          <Feather name={showCategories ? "chevron-down" : "chevron-right"} size={20} color={"#14391f"} />
         </Pressable>
 
         {showCategories && (
           <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginTop: 10, marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <View>
-                <Text style={{ fontWeight: 'bold', marginBottom: 4, color: Colors.textPrimary }}>Categorias Disponíveis</Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{categories.length} categorias configuradas</Text>
+                <Text style={{ fontWeight: 'bold', marginBottom: 4, color: "#14391f" }}>Categorias Disponíveis</Text>
+                <Text style={{ color: "#14391f", fontSize: 12 }}>{categories.length} categorias configuradas</Text>
               </View>
               {loadingCategories ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
             </View>
@@ -150,7 +150,7 @@ export default function SettingsScreen() {
             </View>
 
             <View style={{ marginBottom: 12 }}>
-              <Text style={{ fontWeight: 'bold', marginBottom: 8, color: Colors.textPrimary }}>
+              <Text style={{ fontWeight: 'bold', marginBottom: 8, color: "#14391f" }}>
                 {editingCategoryId ? "Editar categoria" : "Escolha um ícone"}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -160,7 +160,7 @@ export default function SettingsScreen() {
                     onPress={() => setNewCategoryIcon(icon)}
                     style={{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: newCategoryIcon === icon ? Colors.primary : '#F1F5F9' }}
                   >
-                    <Feather name={icon} size={20} color={newCategoryIcon === icon ? '#fff' : Colors.textPrimary} />
+                    <Feather name={icon} size={20} color={newCategoryIcon === icon ? '#fff' : "#14391f"} />
                   </Pressable>
                 ))}
               </View>
@@ -170,7 +170,7 @@ export default function SettingsScreen() {
               <TextInput
                 style={[styles.editInput, { flex: 1, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46 }]}
                 placeholder="Nome da categoria..."
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={"#14391f"}
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
               />
@@ -204,15 +204,15 @@ export default function SettingsScreen() {
               <Text style={styles.menuItemSubtitle}>Mantenha sua conta protegida</Text>
             </View>
           </View>
-          <Feather name={showSecurity ? "chevron-down" : "chevron-right"} size={20} color={Colors.textMuted} />
+          <Feather name={showSecurity ? "chevron-down" : "chevron-right"} size={20} color={"#14391f"} />
         </Pressable>
 
         {showSecurity && (
           <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginHorizontal: 20, marginBottom: 10 }}>
-            <Text style={{ fontWeight: 'bold', marginBottom: 12, color: Colors.textPrimary }}>Alterar Senha</Text>
-            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Senha atual" placeholderTextColor={Colors.textMuted} secureTextEntry value={currentPassword} onChangeText={setCurrentPassword} />
-            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Nova senha" placeholderTextColor={Colors.textMuted} secureTextEntry value={newPassword} onChangeText={setNewPassword} />
-            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 16 }]} placeholder="Confirmar nova senha" placeholderTextColor={Colors.textMuted} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+            <Text style={{ fontWeight: 'bold', marginBottom: 12, color: "#14391f" }}>Alterar Senha</Text>
+            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Senha atual" placeholderTextColor={"#14391f"} secureTextEntry value={currentPassword} onChangeText={setCurrentPassword} />
+            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 10 }]} placeholder="Nova senha" placeholderTextColor={"#14391f"} secureTextEntry value={newPassword} onChangeText={setNewPassword} />
+            <TextInput style={[styles.editInput, { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, borderRadius: 8, height: 46, marginBottom: 16 }]} placeholder="Confirmar nova senha" placeholderTextColor={"#14391f"} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
             <Pressable style={[styles.saveBtn, { height: 46 }]} onPress={handleUpdatePassword}>
               <Text style={{ color: '#fff', fontWeight: 'bold' }}>Atualizar Senha</Text>
             </Pressable>
@@ -237,13 +237,13 @@ export default function SettingsScreen() {
 
         {showBackup && (
           <View style={{ padding: 15, backgroundColor: Colors.background, borderRadius: 10, marginHorizontal: 20, marginBottom: 10 }}>
-            <Text style={{ fontWeight: 'bold', marginBottom: 6, color: Colors.textPrimary }}>Backup da Conta</Text>
-            <Text style={{ fontSize: 13, color: Colors.textGray, marginBottom: 16 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 6, color: "#14391f" }}>Backup da Conta</Text>
+            <Text style={{ fontSize: 13, color: "#14391f", marginBottom: 16 }}>
               Seus dados estão sendo salvos na nuvem em tempo real de forma automática.
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Feather name="check-circle" size={16} color={Colors.success} style={{ marginRight: 6 }} />
-              <Text style={{ fontSize: 13, color: Colors.textPrimary, fontWeight: '500' }}>
+              <Text style={{ fontSize: 13, color: "#14391f", fontWeight: '500' }}>
                 Último backup: Hoje, {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
@@ -300,22 +300,22 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: '#d3f394' },
   content: { padding: Spacing.xl, paddingTop: 50, paddingBottom: 100 },
   header: { marginBottom: 20 },
-  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: "#14391f" },
   profileSection: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 30 },
   profileAvatar: { width: 60, height: 60, borderRadius: 30 },
-  profileName: { fontSize: 20, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
-  profileEmail: { fontSize: 14, color: Colors.textGray, marginTop: 2 },
+  profileName: { fontSize: 20, fontWeight: FontWeight.semibold, color: "#14391f" },
+  profileEmail: { fontSize: 14, color: "#14391f", marginTop: 2 },
   inputGroup: { marginBottom: 20 },
-  inputLabel: { fontSize: 12, fontWeight: FontWeight.bold, color: Colors.textGray, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  inputLabel: { fontSize: 12, fontWeight: FontWeight.bold, color: "#14391f", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   limitDisplayCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: Colors.surface, borderRadius: BorderRadius.xxl, padding: 16, ...Shadow.sm },
-  limitDisplayValue: { fontSize: 18, fontWeight: "700", color: Colors.textPrimary },
+  limitDisplayValue: { fontSize: 18, fontWeight: "700", color: "#14391f" },
   editLimitCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: Colors.surface, borderRadius: BorderRadius.xxl, padding: 16, gap: Spacing.md, ...Shadow.sm },
   editInputRow: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: Colors.background, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-  currencyPrefix: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginRight: Spacing.xs },
-  editLimitInput: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, paddingVertical: Spacing.sm },
+  currencyPrefix: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: "#14391f", marginRight: Spacing.xs },
+  editLimitInput: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.bold, color: "#14391f", paddingVertical: Spacing.sm },
   editLimitActions: { flexDirection: "row", gap: Spacing.sm },
   editLimitSaveBtn: { backgroundColor: Colors.success, width: 36, height: 36, borderRadius: BorderRadius.md, alignItems: "center", justifyContent: "center" },
   editLimitCancelBtn: { backgroundColor: Colors.borderLight, width: 36, height: 36, borderRadius: BorderRadius.md, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: Colors.border },
@@ -323,11 +323,11 @@ const styles = StyleSheet.create({
   menuItem: { paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   menuItemLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   menuItemIcon: { width: 20, textAlign: "center" },
-  menuItemText: { fontSize: 15, fontWeight: "500", color: Colors.textPrimary },
-  menuItemTitle: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary },
-  menuItemSubtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  menuItemText: { fontSize: 15, fontWeight: "500", color: "#14391f" },
+  menuItemTitle: { fontSize: 15, fontWeight: "600", color: "#14391f" },
+  menuItemSubtitle: { fontSize: 12, color: "#14391f", marginTop: 2 },
   menuIcon: { width: 36, height: 36, borderRadius: BorderRadius.md, alignItems: "center", justifyContent: "center" },
   menuDivider: { height: 1, backgroundColor: "#F1F5F9" },
-  editInput: { backgroundColor: Colors.surface, color: Colors.textPrimary },
+  editInput: { backgroundColor: Colors.surface, color: "#14391f" },
   saveBtn: { backgroundColor: Colors.primary, borderRadius: BorderRadius.md, alignItems: "center", justifyContent: "center" },
 });
