@@ -157,7 +157,12 @@ export function useHistoryViewModel() {
       return { value: currentBalance, label: date.split("-")[2] };
     });
     
-    return [{ value: 0, label: "" }, ...data];
+    const finalData = [{ value: 0, label: "" }, ...data];
+    const minVal = Math.min(...finalData.map(d => d.value));
+    if (minVal < 0) {
+      return finalData.map(d => ({ ...d, value: d.value - minVal }));
+    }
+    return finalData;
   }, [filteredTransactions, activeFilter]);
 
   // ─── Agrupamento por data ─────────────────────────────────────────────────
@@ -180,6 +185,7 @@ export function useHistoryViewModel() {
         valor: String(item.valor),
         tipo: item.tipo,
         categoria_nome: item.categoria ?? "",
+        id_categoria: item.id_categoria ? String(item.id_categoria) : undefined,
         data_transacao: item.data_transacao,
         id_carteira: String(item.id_carteira ?? 1),
       },

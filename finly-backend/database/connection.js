@@ -16,5 +16,9 @@ pool.connect((err, client, release) => {
   console.log("Conectado ao Supabase (PostgreSQL)!");
   release();
 });
+// Listener para evitar que o backend crashe quando a conexão cair no Supabase
+pool.on("error", (err, client) => {
+  console.error("Unexpected error on idle client", err.message);
+});
 
 module.exports = pool;

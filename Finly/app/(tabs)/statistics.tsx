@@ -140,7 +140,9 @@ const DailyLineChart = memo(function DailyLineChart({ transactions, year, month,
     <View>
       <Text style={s.chartSubtitle}>Gastos por dia — {MONTHS_PT[month]}</Text>
       <View style={{ marginTop: 20 }}>
-        <LineChart areaChart data={lineData} hideDataPoints startFillColor={Colors.primary} startOpacity={0.3} endFillColor={Colors.primary} endOpacity={0.02} color={Colors.primary} thickness={3} xAxisThickness={0} yAxisThickness={0} yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }} xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 10 }} noOfSections={4} maxValue={Math.max(...daily, 100)} isAnimated curved />
+        <Text style={{ fontSize: 10, color: Colors.textMuted, marginBottom: 4, alignSelf: 'flex-start' }}>Valor (R$)</Text>
+        <LineChart areaChart data={lineData} startFillColor={Colors.primary} startOpacity={0.3} endFillColor={Colors.primary} endOpacity={0.02} color={Colors.primary} thickness={3} xAxisColor={Colors.border} yAxisColor={Colors.border} yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }} xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 10 }} rulesColor={Colors.borderLight} noOfSections={4} maxValue={Math.max(...daily, 100)} isAnimated curved height={120} width={SCREEN_W - 90} initialSpacing={20} />
+        <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 4, textAlign: 'center' }}>Dias do mês</Text>
       </View>
     </View>
   );

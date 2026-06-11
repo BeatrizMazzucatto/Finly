@@ -8,7 +8,9 @@ import {
   Pressable,
   TextInput,
   StatusBar,
+  Dimensions
 } from "react-native";
+const SCREEN_W = Dimensions.get("window").width;
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Colors, BorderRadius, FontSize, FontWeight, Spacing } from "@/constants/theme";
@@ -21,10 +23,10 @@ import type { Transaction } from "@/src/types/api";
 const FILTER_OPTIONS = ["Todos", "Receitas", "Despesas"];
 
 const SORT_OPTIONS = [
-  { key: "recent",  label: "Mais recentes" },
-  { key: "oldest",  label: "Mais antigas"  },
-  { key: "highest", label: "Maior valor"   },
-  { key: "lowest",  label: "Menor valor"   },
+  { key: "recent", label: "Mais recentes" },
+  { key: "oldest", label: "Mais antigas" },
+  { key: "highest", label: "Maior valor" },
+  { key: "lowest", label: "Menor valor" },
 ] as const;
 
 export default function HistoryScreen() {
@@ -196,24 +198,34 @@ export default function HistoryScreen() {
       {activeFilter === "Todos" && lineDataBalance.length > 0 && (
         <Card style={styles.summaryCard}>
           <Text style={{ fontSize: 14, fontWeight: "bold", color: Colors.textPrimary, marginBottom: 12 }}>Saldo</Text>
-          <View style={{ alignItems: "center" }}>
+          <View style={{ alignItems: "center", width: "100%" }}>
+            <Text style={{ fontSize: 10, color: Colors.textMuted, marginBottom: 4, alignSelf: 'flex-start' }}>Valor (R$)</Text>
             <LineChart
               data={lineDataBalance}
-              areaChart hideDataPoints
+              areaChart 
               startFillColor={Colors.primary} startOpacity={0.3}
-              endFillColor={Colors.primary}   endOpacity={0.02}
-              color={Colors.primary} thickness={2}
-              xAxisThickness={0} yAxisThickness={0}
-              hideYAxisText hideRules curved height={100} width={250}
+              endFillColor={Colors.primary} endOpacity={0.02}
+              color={Colors.primary} thickness={3}
+              xAxisColor={Colors.border} yAxisColor={Colors.border}
+              yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
+              xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
+              rulesColor={Colors.borderLight}
+              curved 
+              height={120} 
+              width={SCREEN_W - 90}
+              initialSpacing={20}
+              noOfSections={4}
+              isAnimated
             />
+            <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 4, textAlign: 'center' }}>Dias do mês</Text>
           </View>
         </Card>
       )}
     </>
   ), [showSort, showSearch, sortOrder, searchQuery, activeFilter, activeMonthFilter,
-      monthFilters, totalReceitas, totalDespesas, totalFiltered, lineDataBalance,
-      toggleSort, toggleSearch, setSortOrder, setSearchQuery, setActiveFilter,
-      navigateToPrevMonth, navigateToNextMonth, canGoPrevMonth, canGoNextMonth]);
+    monthFilters, totalReceitas, totalDespesas, totalFiltered, lineDataBalance,
+    toggleSort, toggleSearch, setSortOrder, setSearchQuery, setActiveFilter,
+    navigateToPrevMonth, navigateToNextMonth, canGoPrevMonth, canGoNextMonth]);
 
   const ListEmpty = useMemo(() => (
     <Card style={styles.emptyCard}>

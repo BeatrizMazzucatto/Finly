@@ -50,9 +50,16 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         <View style={styles.dashHeader}>
-          <View>
-            <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>Olá!</Text>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>{user?.nome}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>
+                {user?.nome ? user.nome.substring(0, 2).toUpperCase() : 'US'}
+              </Text>
+            </View>
+            <View>
+              <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>Olá!</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>{user?.nome}</Text>
+            </View>
           </View>
         </View>
 

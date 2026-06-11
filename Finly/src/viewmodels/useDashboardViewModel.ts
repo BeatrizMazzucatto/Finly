@@ -12,8 +12,8 @@ export function useDashboardViewModel() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [focusedCat, setFocusedCat] = useState<{name: string, value: number} | null>(null);
-  
+  const [focusedCat, setFocusedCat] = useState<{ name: string, value: number } | null>(null);
+
 
   const [chartType, setChartType] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
   const [walletFilter, setWalletFilter] = useState<'AMBAS' | 'PESSOAL' | 'CONJUNTA'>('PESSOAL');

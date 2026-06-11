@@ -126,8 +126,8 @@ export function useSettingsViewModel() {
       setExporting(true);
       const allTransactions = await getTransactionsByUser(user.id_usuario);
       const jointId = user.id_carteira_conjunta ?? 3;
-      
-      const transactions = allTransactions.filter(t => 
+
+      const transactions = allTransactions.filter(t =>
         carteiraType === "CONJUNTA" ? t.id_carteira === jointId : t.id_carteira !== jointId
       );
 

@@ -11,6 +11,7 @@ import {
 } from "@/constants/theme";
 import { getCategoryColor, getCategoryIcon } from "@/constants/categories";
 import { formatCurrency } from "@/utils/formatters";
+import { useAuth } from "@/src/context/AuthContext";
 
 interface TransactionItemProps {
   id: number;
@@ -47,58 +48,62 @@ export const TransactionItem = memo(function TransactionItem({
   const iconName = getCategoryIcon(categoria);
   const categoryColor = getCategoryColor(categoria);
 
-  const isJoint = id_carteira === 3;
-  const iconBgColor = isJoint ? Colors.jointLight : (categoryColor + "20");
-  const iconColor = isJoint ? Colors.jointPrimary : categoryColor;
+  const { user } = useAuth();
+  const isJoint = id_carteira !== undefined && id_carteira === user?.id_carteira_conjunta;
+  const iconBgColor = categoryColor + "20";
+  const iconColor = categoryColor;
 
   const content = (
     <View style={[styles.container, style]}>
-      <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
-        <Feather name={isJoint ? "shopping-cart" : iconName} size={20} color={iconColor} />
-      </View>
-
-      <View style={styles.info}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>{titulo}</Text>
-          {isJoint && (
-            <View style={styles.jointBadge}>
-              <Text style={styles.jointBadgeText}>CONJUNTO</Text>
+      {isJoint && (
+        <View style={styles.headerRow}>
+          {usuario_nome ? (
+            <View style={styles.userRow}>
+              <View style={styles.avatarMini}>
+                <Text style={styles.avatarMiniText}>
+                  {usuario_nome.substring(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.userText}>{usuario_nome} registrou</Text>
             </View>
-          )}
-        </View>
-        <View style={styles.metaRow}>
-          {isJoint && usuario_nome && (
-            <Image
-              source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(usuario_nome)}&background=9333EA&color=fff` }}
-              style={styles.avatarMini}
-            />
-          )}
-          <Text style={styles.meta}>
-            {isJoint && usuario_nome ? `${usuario_nome} registrou • ` : ""}{categoria}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.valueContainer}>
-        <Text style={[styles.value, { color: isExpense ? Colors.textPrimary : Colors.success }]}>
-          {isExpense ? "- " : "+ "}{formatCurrency(valor)}
-        </Text>
-      </View>
-
-      {showActions && (
-        <View style={styles.actions}>
-          {onEdit && (
-            <Pressable style={styles.actionBtn} onPress={onEdit}>
-              <Feather name="edit-2" size={16} color={Colors.textMuted} />
-            </Pressable>
-          )}
-          {onDelete && (
-            <Pressable style={styles.actionBtn} onPress={onDelete}>
-              <Feather name="trash-2" size={16} color={Colors.error} />
-            </Pressable>
-          )}
+          ) : <View />}
+          <View style={styles.jointBadge}>
+            <Text style={styles.jointBadgeText}>CONJUNTO</Text>
+          </View>
         </View>
       )}
+
+      <View style={styles.mainRow}>
+        <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
+          <Feather name={iconName} size={20} color={iconColor} />
+        </View>
+
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={1}>{titulo}</Text>
+          <Text style={styles.categoryText}>{categoria}</Text>
+        </View>
+
+        <View style={styles.valueContainer}>
+          <Text style={[styles.value, { color: isExpense ? Colors.textPrimary : Colors.success }]}>
+            {isExpense ? "- " : "+ "}{formatCurrency(valor)}
+          </Text>
+        </View>
+
+        {showActions && (
+          <View style={styles.actions}>
+            {onEdit && (
+              <Pressable style={styles.actionBtn} onPress={onEdit}>
+                <Feather name="edit-2" size={16} color={Colors.textMuted} />
+              </Pressable>
+            )}
+            {onDelete && (
+              <Pressable style={styles.actionBtn} onPress={onDelete}>
+                <Feather name="trash-2" size={16} color={Colors.error} />
+              </Pressable>
+            )}
+          </View>
+        )}
+      </View>
     </View>
   );
 
@@ -115,12 +120,59 @@ export const TransactionItem = memo(function TransactionItem({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
-    padding: 14,
+    padding: 16,
     ...Shadow.sm,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: 12,
+  },
+  jointBadge: {
+    backgroundColor: Colors.jointLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  jointBadgeText: {
+    color: Colors.jointPrimary,
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+  },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  avatarMini: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.jointPrimary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarMiniText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  userText: {
+    fontSize: 13,
+    color: Colors.textGray,
+    fontWeight: "500",
+  },
+  mainRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   iconContainer: {
     width: 48,
@@ -132,12 +184,7 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    gap: 2,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
+    gap: 4,
   },
   title: {
     fontSize: 16,
@@ -145,30 +192,8 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     flexShrink: 1,
   },
-  jointBadge: {
-    backgroundColor: Colors.jointLight,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 0,
-  },
-  jointBadgeText: {
-    color: Colors.jointPrimary,
-    fontSize: 10,
-    fontWeight: FontWeight.bold,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatarMini: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginRight: 6,
-  },
-  meta: {
-    fontSize: 13,
+  categoryText: {
+    fontSize: 14,
     color: Colors.textGray,
   },
   valueContainer: {
