@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { getCategories, createCategory, updateCategory, deleteCategory } from "@/src/services/categories";
+import { buildTransactionsCsv, exportCsvBackup, getBackupFileName } from "@/src/services/backup";
 import { getTransactionsByUser } from "@/src/services/transactions";
 import { Colors } from "@/constants/theme";
 import { formatMoneyInput } from "@/utils/formatters";
@@ -122,30 +123,46 @@ export function useSettingsViewModel() {
 
   async function handleExportBackup(carteiraType: "PESSOAL" | "CONJUNTA") {
     if (!user) return;
+
+    const walletId =
+      carteiraType === "CONJUNTA"
+        ? user.id_carteira_conjunta
+        : user.id_carteira_pessoal;
+
+    if (!walletId) {
+      Alert.alert("Erro", "Carteira não encontrada para exportação.");
+      return;
+    }
+
     try {
       setExporting(true);
       const allTransactions = await getTransactionsByUser(user.id_usuario);
-      const jointId = user.id_carteira_conjunta ?? 3;
+      const transactions = allTransactions.filter((t) => t.id_carteira === walletId);
+      const csvContent = buildTransactionsCsv(transactions);
+      const fileName = getBackupFileName(carteiraType);
+      const carteiraLabel = carteiraType === "CONJUNTA" ? "conjunta" : "pessoal";
+      const result = await exportCsvBackup(csvContent, fileName, carteiraLabel);
 
-      const transactions = allTransactions.filter(t =>
-        carteiraType === "CONJUNTA" ? t.id_carteira === jointId : t.id_carteira !== jointId
-      );
-
-      const header = "ID,Titulo,Valor,Data,Tipo,Categoria\n";
-      const csvContent = transactions.map(t => `${t.id_transacao},"${t.titulo}",${t.valor},${t.data_transacao},${t.tipo},"${t.categoria || ''}"`).join("\n");
-      const fullCsv = header + csvContent;
-      if (Platform.OS === 'web') {
-        const blob = new Blob([fullCsv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url); link.setAttribute("download", `finly_backup_${carteiraType.toLowerCase()}_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        Alert.alert("Sucesso", `Backup da carteira ${carteiraType.toLowerCase()} efetuado com sucesso (CSV baixado).`);
+      if (result === "downloaded") {
+        Alert.alert(
+          "Sucesso",
+          `Backup da carteira ${carteiraLabel} efetuado com sucesso (CSV baixado).`
+        );
       } else {
-        Alert.alert("Backup Gerado!", "Em um ambiente real (app nativo), aqui o arquivo CSV seria salvo ou compartilhado.");
+        Alert.alert(
+          "Backup pronto",
+          `Escolha onde salvar ou compartilhar o CSV da carteira ${carteiraLabel}.`
+        );
       }
-    } catch (err) { console.error(err); Alert.alert("Erro", "Não foi possível gerar o backup."); }
-    finally { setExporting(false); }
+    } catch (err) {
+      console.error(err);
+      Alert.alert(
+        "Erro",
+        err instanceof Error ? err.message : "Não foi possível gerar o backup."
+      );
+    } finally {
+      setExporting(false);
+    }
   }
 
   function handleLimiteChange(text: string) { setLimite(formatMoneyInput(text)); }
