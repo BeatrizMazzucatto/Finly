@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Modal, View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Alert, Platform, AlertButton } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, Shadow } from "@/constants/theme";
-import { Category, createCategory, editCategory, deleteCategory } from "@/src/services/categories";
+import { Category, createCategory, updateCategory, deleteCategory } from "@/src/services/categories";
 
 interface CategoryManagerModalProps {
   visible: boolean;
@@ -35,7 +35,7 @@ const ICONS = [
 ];
 
 const COLORS = [
-  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", 
+  "#3B82F6", "#3A8F31", "#F59E0B", "#D6492B", 
   "#8B5CF6", "#EC4899", "#6366F1", "#14B8A6"
 ];
 
@@ -44,7 +44,7 @@ const showAlert = (title: string, message: string, options?: AlertButton[]) => {
     if (options && options.length > 1) {
       const confirm = window.confirm(`${title}\n\n${message}`);
       if (confirm) {
-        options.find(o => o.style === 'destructive' || o.text === 'Apagar')?.onPress();
+        options.find(o => o.style === 'destructive' || o.text === 'Apagar')?.onPress?.();
       }
     } else {
       window.alert(`${title}\n\n${message}`);
@@ -92,7 +92,7 @@ export function CategoryManagerModal({ visible, onClose, categorias, idCarteira,
     setLoading(true);
     try {
       if (editingCategory) {
-        await editCategory(editingCategory.id_categoria, { nome, icone, cor_hex: corHex });
+        await updateCategory(editingCategory.id_categoria, { nome, icone, cor_hex: corHex });
       } else {
         await createCategory({ nome, icone, cor_hex: corHex, id_carteira: idCarteira });
       }

@@ -17,4 +17,6 @@ export interface Transaction {
   data_transacao: string;
   categoria: string | null;
   id_categoria?: number;
+  icone?: string;
+  cor_hex?: string;
 }

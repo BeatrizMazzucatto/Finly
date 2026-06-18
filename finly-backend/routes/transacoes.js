@@ -109,7 +109,9 @@ router.get("/:id_usuario", (req, res) => {
       t.valor,
       t.id_categoria,
       TO_CHAR(t.data_transacao, 'YYYY-MM-DD') AS data_transacao,
-      c.nome AS categoria
+      c.nome AS categoria,
+      c.icone,
+      c.cor_hex
     FROM transacoes t
     LEFT JOIN categorias c ON t.id_categoria = c.id_categoria
     LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario

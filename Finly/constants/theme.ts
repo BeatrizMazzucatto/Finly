@@ -18,18 +18,18 @@ export const Colors = {
   border: "#E2E8F0",
   borderLight: "#F1F5F9",
 
-  success: "#10B981",
+  success: "#3A8F31",
   successLight: "#D1FAE5",
-  error: "#EF4444",
+  error: "#D6492B",
   errorLight: "#FEE2E2",
   warning: "#F59E0B",
   warningLight: "#FEF3C7",
   info: "#3B82F6",
   infoLight: "#DBEAFE",
 
-  income: "#10B981",
+  income: "#3A8F31",
   incomeLight: "#D1FAE5",
-  expense: "#EF4444",
+  expense: "#D6492B",
   expenseLight: "#FEE2E2",
 
   jointPrimary: "#9333EA",
@@ -62,8 +62,8 @@ export const Colors = {
     educacao: "#0284C7",
     compras: "#DB2777",
     servicos: "#0284C7",
-    salario: "#10B981",
-    investimentos: "#10B981",
+    salario: "#3A8F31",
+    investimentos: "#3A8F31",
     outros: "#64748B",
   },
   light: {

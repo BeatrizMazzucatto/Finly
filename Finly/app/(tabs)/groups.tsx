@@ -113,24 +113,24 @@ export default function GroupsScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-                  <Pressable onPress={() => { setChartType("DESPESA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "DESPESA" ? { backgroundColor: '#FEE2E2' } : { backgroundColor: 'transparent' }]}>
-                    <Text style={{ color: chartType === "DESPESA" ? '#EF4444' : '#64748B', fontWeight: 'bold' }}>Despesas</Text>
+                  <Pressable onPress={() => { setChartType("DESPESA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "DESPESA" ? { backgroundColor: '#D6492B' } : { backgroundColor: 'transparent' }]}>
+                    <Text style={{ color: chartType === "DESPESA" ? 'white' : '#14391f', fontWeight: 'bold' }}>Despesas</Text>
                   </Pressable>
-                  <Pressable onPress={() => { setChartType("RECEITA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "RECEITA" ? { backgroundColor: '#D1FAE5' } : { backgroundColor: 'transparent' }]}>
-                    <Text style={{ color: chartType === "RECEITA" ? '#10B981' : '#64748B', fontWeight: 'bold' }}>Receitas</Text>
+                  <Pressable onPress={() => { setChartType("RECEITA"); setFocusedCat(null); }} style={[{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, chartType === "RECEITA" ? { backgroundColor: '#3A8F31' } : { backgroundColor: 'transparent' }]}>
+                    <Text style={{ color: chartType === "RECEITA" ? 'white' : '#14391f', fontWeight: 'bold' }}>Receitas</Text>
                   </Pressable>
                 </View>
 
                 <View style={{ alignItems: 'center', marginBottom: 40 }}>
                   {Object.entries(activeCats).length > 0 ? (
                     <PieChart
-                      data={Object.entries(activeCats).map(([cat, val]) => ({
-                        value: val,
-                        color: getCategoryColor(cat),
+                      data={Object.entries(activeCats).map(([cat, dataObj]: any) => ({
+                        value: dataObj.value,
+                        color: dataObj.cor_hex || getCategoryColor(cat),
                         focused: focusedCat?.name === cat,
                         onPress: () => {
                           if (focusedCat?.name === cat) setFocusedCat(null);
-                          else setFocusedCat({ name: cat, value: val });
+                          else setFocusedCat({ name: cat, value: dataObj.value });
                         },
                       }))}
                       donut
@@ -138,20 +138,20 @@ export default function GroupsScreen() {
                       toggleFocusOnPress
                       radius={100}
                       innerRadius={70}
-                      innerCircleColor={'#F8FAFC'}
+                      innerCircleColor={'#d3f394'}
                       centerLabelComponent={() => {
                         if (focusedCat) {
                           return (
                             <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                              <Text style={{ fontSize: 12, color: getCategoryColor(focusedCat.name), fontWeight: 'bold' }}>{focusedCat.name}</Text>
-                              <Text style={{ fontSize: 20, color: '#0F172A', fontWeight: 'bold' }}>{formatCurrency(focusedCat.value)}</Text>
+                              <Text style={{ fontSize: 12, color: '#14391f', fontWeight: 'bold' }}>{focusedCat.name}</Text>
+                              <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#D6492B' : '#3A8F31', fontWeight: 'bold' }}>{formatCurrency(focusedCat.value)}</Text>
                             </View>
                           );
                         }
                         return (
                           <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: 'bold' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
-                            <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#EF4444' : '#10B981', fontWeight: 'bold' }}>
+                            <Text style={{ fontSize: 12, color: '#14391f', fontWeight: 'bold' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
+                            <Text style={{ fontSize: 20, color: chartType === "DESPESA" ? '#D6492B' : '#3A8F31', fontWeight: 'bold' }}>
                               {formatCurrency(chartType === "DESPESA" ? totalDespesasConjuntas : totalReceitas)}
                             </Text>
                           </View>
@@ -161,8 +161,8 @@ export default function GroupsScreen() {
                   ) : (
                     <View style={styles.ringContainer}>
                       <View style={styles.ringInner}>
-                        <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
-                        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0F172A' }}>
+                        <Text style={{ color: '#14391f', fontSize: 12, fontWeight: '600' }}>{chartType === "DESPESA" ? "Despesas" : "Receitas"}</Text>
+                        <Text style={{ fontSize: 24, fontWeight: 'bold', color: chartType === "DESPESA" ? '#D6492B' : '#3A8F31' }}>
                           {formatCurrency(chartType === "DESPESA" ? totalDespesasConjuntas : totalReceitas)}
                         </Text>
                       </View>
@@ -182,8 +182,8 @@ export default function GroupsScreen() {
                       {chartType === 'DESPESA' ? 'Nenhum gasto registrado.' : 'Nenhuma receita registrada.'}
                     </Text>
                   ) : (
-                    Object.entries(activeCats).map(([cat, val]) => (
-                      <CategoryCard key={cat} category={cat} value={val} />
+                    Object.entries(activeCats).map(([cat, dataObj]: any) => (
+                      <CategoryCard key={cat} category={cat} value={dataObj.value} icone={dataObj.icone} cor_hex={dataObj.cor_hex} />
                     ))
                   )}
                 </ScrollView>
@@ -210,6 +210,8 @@ export default function GroupsScreen() {
                       valor={Number(t.valor)}
                       tipo={t.tipo}
                       categoria={t.categoria || "Outros"}
+                      icone={t.icone}
+                      cor_hex={t.cor_hex}
                       data={formatDateMD(t.data_transacao)}
                       style={{ marginBottom: 12 }}
                     />
@@ -308,6 +310,8 @@ export default function GroupsScreen() {
                           valor={Number(t.valor)}
                           tipo={t.tipo}
                           categoria={t.categoria || "Outros"}
+                          icone={t.icone}
+                          cor_hex={t.cor_hex}
                           data={formatDateMD(t.data_transacao)}
                           showActions
                           onEdit={() => handleEdit(t)}
@@ -398,8 +402,8 @@ export default function GroupsScreen() {
             <Text style={styles.modalLabel}>Limite Mensal (R$)</Text>
             <TextInput style={styles.modalInput} placeholder="Ex: 5000" value={newWalletLimit} onChangeText={setNewWalletLimit} keyboardType="numeric" />
             <View style={styles.modalActions}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setModalCreateVisible(false)}>
-                <Text style={{ color: '#64748B', fontWeight: 'bold' }}>Cancelar</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: 'white' }]} onPress={() => setModalCreateVisible(false)}>
+                <Text style={{ color: '#14391f', fontWeight: 'bold' }}>Cancelar</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, { backgroundColor: Colors.jointPrimary }]} onPress={handleCreateWallet} disabled={loadingAction}>
                 {loadingAction ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: 'bold' }}>Criar</Text>}
@@ -424,8 +428,8 @@ export default function GroupsScreen() {
             <Text style={styles.modalLabel}>Novo Limite Mensal (R$)</Text>
             <TextInput style={styles.modalInput} placeholder="Ex: 8000" value={newWalletLimit} onChangeText={setNewWalletLimit} keyboardType="numeric" />
             <View style={styles.modalActions}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setModalEditVisible(false)}>
-                <Text style={{ color: '#64748B', fontWeight: 'bold' }}>Cancelar</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: 'white' }]} onPress={() => setModalEditVisible(false)}>
+                <Text style={{ color: '#14391f', fontWeight: 'bold' }}>Cancelar</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, { backgroundColor: Colors.jointPrimary }]} onPress={handleEditWallet} disabled={loadingAction}>
                 {loadingAction ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: 'bold' }}>Salvar</Text>}
@@ -443,8 +447,8 @@ export default function GroupsScreen() {
             <Text style={styles.modalLabel}>Código de Convite</Text>
             <TextInput style={styles.modalInput} placeholder="Ex: JOIN-A1B2C3" value={joinCode} onChangeText={setJoinCode} autoCapitalize="characters" />
             <View style={styles.modalActions}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setModalJoinVisible(false)}>
-                <Text style={{ color: '#64748B', fontWeight: 'bold' }}>Cancelar</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: 'white' }]} onPress={() => setModalJoinVisible(false)}>
+                <Text style={{ color: '#14391f', fontWeight: 'bold' }}>Cancelar</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, { backgroundColor: Colors.jointPrimary }]} onPress={handleJoinWallet} disabled={loadingAction}>
                 {loadingAction ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: 'bold' }}>Entrar</Text>}
@@ -463,22 +467,22 @@ export default function GroupsScreen() {
               {currentUserRole === 'PROPRIETARIO' ? (
                 <>
                   <Pressable style={styles.settingsMenuBtn} onPress={openEditModal}>
-                    <Feather name="edit" size={20} color={Colors.textPrimary} />
+                    <Feather name="edit" size={20} color={'#14391f'} />
                     <Text style={styles.settingsMenuText}>Editar Carteira</Text>
                   </Pressable>
                   <Pressable style={styles.settingsMenuBtn} onPress={openDeleteFromSettings}>
-                    <Feather name="trash-2" size={20} color={Colors.error} />
-                    <Text style={[styles.settingsMenuText, { color: Colors.error }]}>Apagar Carteira</Text>
+                    <Feather name="trash-2" size={20} color={'#D6492B'} />
+                    <Text style={[styles.settingsMenuText, { color: '#D6492B' }]}>Apagar Carteira</Text>
                   </Pressable>
                 </>
               ) : (
                 <Pressable style={styles.settingsMenuBtn} onPress={openLeaveFromSettings}>
-                  <Feather name="log-out" size={20} color={Colors.error} />
-                  <Text style={[styles.settingsMenuText, { color: Colors.error }]}>Sair da Carteira</Text>
+                  <Feather name="log-out" size={20} color={'#D6492B'} />
+                  <Text style={[styles.settingsMenuText, { color: '#D6492B' }]}>Sair da Carteira</Text>
                 </Pressable>
               )}
-              <Pressable style={[styles.settingsMenuBtn, { justifyContent: 'center', backgroundColor: '#F1F5F9', borderWidth: 0 }]} onPress={() => setModalSettingsVisible(false)}>
-                <Text style={{ fontWeight: 'bold', color: Colors.textPrimary }}>Cancelar</Text>
+              <Pressable style={[styles.settingsMenuBtn, { justifyContent: 'center', backgroundColor: 'white', borderWidth: 0 }]} onPress={() => setModalSettingsVisible(false)}>
+                <Text style={{ fontWeight: 'bold', color: '#14391f' }}>Cancelar</Text>
               </Pressable>
             </View>
           </View>
@@ -495,7 +499,7 @@ export default function GroupsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: '#d3f394' },
   header: { paddingTop: 50, paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.xl },
   headerTitle: { fontSize: 24, fontWeight: "bold", color: Colors.textPrimary },
   settingsIcon: { padding: 8 },
@@ -520,14 +524,14 @@ const styles = StyleSheet.create({
   inviteButtonContainer: { width: '100%', marginTop: 10, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 15 },
   inviteLink: { color: Colors.jointPrimary, fontWeight: 'bold', textAlign: 'center', padding: 10 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: 'white', width: '85%', borderRadius: 20, padding: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 20, textAlign: 'center' },
-  modalLabel: { fontSize: 12, fontWeight: 'bold', color: Colors.textSecondary, marginBottom: 8, marginTop: 10 },
-  modalInput: { backgroundColor: '#F1F5F9', borderRadius: 12, padding: 16, fontSize: 16, color: Colors.textPrimary, marginBottom: 10 },
+  modalContent: { backgroundColor: '#d3f394', width: '85%', borderRadius: 20, padding: 20 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#14391f', marginBottom: 20, textAlign: 'center' },
+  modalLabel: { fontSize: 12, fontWeight: 'bold', color: '#14391f', marginBottom: 8, marginTop: 10 },
+  modalInput: { backgroundColor: 'white', borderRadius: 12, padding: 16, fontSize: 16, color: '#14391f', marginBottom: 10 },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 20 },
   modalBtn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
-  settingsMenuBtn: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, gap: 10 },
-  settingsMenuText: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary },
+  settingsMenuBtn: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 10, backgroundColor: 'white', gap: 10 },
+  settingsMenuText: { fontSize: 16, fontWeight: 'bold', color: '#14391f' },
   ringContainer: { alignSelf: 'center', width: 200, height: 200, borderRadius: 100, borderWidth: 15, borderColor: Colors.jointPrimary, justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
   ringInner: { alignItems: 'center' },
   monthSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, marginBottom: 20 },
