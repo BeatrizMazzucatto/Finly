@@ -3,6 +3,8 @@ import { Alert, Platform } from "react-native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useAuth } from "@/src/context/AuthContext";
 import { getCategories, createCategory, updateCategory, deleteCategory } from "@/src/services/categories";
 import { getTransactionsByUser } from "@/src/services/transactions";
@@ -142,9 +144,16 @@ export function useSettingsViewModel() {
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
         Alert.alert("Sucesso", `Backup da carteira ${carteiraType.toLowerCase()} efetuado com sucesso (CSV baixado).`);
       } else {
-        Alert.alert("Backup Gerado!", "Em um ambiente real (app nativo), aqui o arquivo CSV seria salvo ou compartilhado.");
+        const fileUri = `${FileSystem.documentDirectory}finly_backup_${carteiraType.toLowerCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, fullCsv);
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: "Backup Finly" });
+        } else {
+          Alert.alert("Erro", "Compartilhamento não disponível no seu dispositivo.");
+        }
       }
-    } catch (err) { console.error(err); Alert.alert("Erro", "Não foi possível gerar o backup."); }
+    } catch (err: any) { console.error(err); Alert.alert("Erro", `Não foi possível gerar o backup: ${err.message}`); }
     finally { setExporting(false); }
   }
 
