@@ -193,14 +193,17 @@ export default function GroupsScreen() {
                   <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>Transações Recentes</Text>
                 </View>
 
-                {recentTransactions.length === 0 ? (
-                  <View style={{ alignItems: 'center', padding: 20, backgroundColor: 'white', borderRadius: 20, elevation: 2 }}>
-                    <Feather name="inbox" size={40} color={Colors.textMuted} style={{ marginBottom: 10 }} />
-                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary }}>Nenhuma transação encontrada</Text>
-                    <Text style={{ color: Colors.textGray }}>Ainda não há lançamentos neste grupo.</Text>
-                  </View>
-                ) : (
-                  recentTransactions.map((t, idx) => (
+                {React.useMemo(() => {
+                  if (recentTransactions.length === 0) {
+                    return (
+                      <View style={{ alignItems: 'center', padding: 20, backgroundColor: 'white', borderRadius: 20, elevation: 2 }}>
+                        <Feather name="inbox" size={40} color={Colors.textMuted} style={{ marginBottom: 10 }} />
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary }}>Nenhuma transação encontrada</Text>
+                        <Text style={{ color: Colors.textGray }}>Ainda não há lançamentos neste grupo.</Text>
+                      </View>
+                    );
+                  }
+                  return recentTransactions.map((t, idx) => (
                     <TransactionItem
                       key={t.id_transacao || idx}
                       id={t.id_transacao}
@@ -215,8 +218,8 @@ export default function GroupsScreen() {
                       data={formatDateMD(t.data_transacao)}
                       style={{ marginBottom: 12 }}
                     />
-                  ))
-                )}
+                  ));
+                }, [recentTransactions])}
               </>
             )}
 
@@ -286,14 +289,17 @@ export default function GroupsScreen() {
                   </Card>
                 )}
 
-                {historyTransactions.length === 0 ? (
-                  <View style={{ alignItems: 'center', padding: 30, backgroundColor: 'white', borderRadius: 20, elevation: 2, marginTop: 20 }}>
-                    <Feather name="inbox" size={48} color={Colors.textMuted} style={{ marginBottom: 15 }} />
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, textAlign: 'center' }}>Nenhuma transação encontrada</Text>
-                    <Text style={{ color: Colors.textGray, textAlign: 'center', marginTop: 8 }}>Tente ajustar seus filtros</Text>
-                  </View>
-                ) : (
-                  historyTransactions.map((t, idx) => {
+                {React.useMemo(() => {
+                  if (historyTransactions.length === 0) {
+                    return (
+                      <View style={{ alignItems: 'center', padding: 30, backgroundColor: 'white', borderRadius: 20, elevation: 2, marginTop: 20 }}>
+                        <Feather name="inbox" size={48} color={Colors.textMuted} style={{ marginBottom: 15 }} />
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, textAlign: 'center' }}>Nenhuma transação encontrada</Text>
+                        <Text style={{ color: Colors.textGray, textAlign: 'center', marginTop: 8 }}>Tente ajustar seus filtros</Text>
+                      </View>
+                    );
+                  }
+                  return historyTransactions.map((t, idx) => {
                     const isNewDate = idx === 0 || t.data_transacao !== historyTransactions[idx - 1].data_transacao;
                     return (
                       <React.Fragment key={t.id_transacao || idx}>
@@ -320,8 +326,8 @@ export default function GroupsScreen() {
                         />
                       </React.Fragment>
                     );
-                  })
-                )}
+                  });
+                }, [historyTransactions, handleEdit, handleDelete])}
               </>
             )}
 
