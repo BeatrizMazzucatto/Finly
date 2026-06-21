@@ -1,0 +1,8 @@
+Networking has been disabled
+Starting project at /Users/analayslla/Finly/Finly-1/Finly
+React Compiler enabled
+Starting Metro Bundler
+
+Skipping dependency validation in offline mode
+Waiting on http://localhost:8081
+Logs for your project will appear below.
